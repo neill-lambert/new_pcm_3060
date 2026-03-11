@@ -31,7 +31,7 @@ __attribute__((section(".ARM.__at_0x24000100"))) int32_t rx_buffer[AUDIO_BUFFER_
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_SPI1_Init(void);
+static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
 
 int main(void) {
@@ -41,13 +41,18 @@ int main(void) {
     //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
     MX_DMA_Init();
-    MX_SPI1_Init();
+    MX_SPI4_Init();
     MX_SAI1_Init();
 
-    /* Initialize PCM3060 via SPI1 */
-    LL_SPI_Enable(SPI1);
-    LL_SPI_StartMasterTransfer(SPI1);
-    PCM3060_Init(SPI1);
+    /* Initialize PCM3060 via SPI4 */
+    LL_GPIO_ResetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin); // Active Low Reset
+    LL_mDelay(10);
+    LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
+    LL_mDelay(10);
+
+    LL_SPI_Enable(SPI4);
+    LL_SPI_StartMasterTransfer(SPI4);
+    PCM3060_Init(SPI4);
 
     /* Start Audio Streaming via SAI DMA (TDM mode) */
 
@@ -120,19 +125,19 @@ static void MX_SAI1_Init(void) {
     SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
 }
 
-static void MX_SPI1_Init(void) {
-    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI1);
+static void MX_SPI4_Init(void) {
+    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI4);
 
-    LL_SPI_SetMode(SPI1, LL_SPI_MODE_MASTER);
-    LL_SPI_SetStandard(SPI1, LL_SPI_PROTOCOL_MOTOROLA);
-    LL_SPI_SetTransferDirection(SPI1, LL_SPI_FULL_DUPLEX);
-    LL_SPI_SetDataWidth(SPI1, LL_SPI_DATAWIDTH_8BIT);
-    LL_SPI_SetClockPolarity(SPI1, LL_SPI_POLARITY_LOW);
-    LL_SPI_SetClockPhase(SPI1, LL_SPI_PHASE_1EDGE);
-    LL_SPI_SetNSSMode(SPI1, LL_SPI_NSS_SOFT);
-    LL_SPI_SetBaudRatePrescaler(SPI1, LL_SPI_BAUDRATEPRESCALER_DIV64);
-    LL_SPI_SetTransferBitOrder(SPI1, LL_SPI_MSB_FIRST);
-    LL_SPI_SetFIFOThreshold(SPI1, LL_SPI_FIFO_TH_01DATA);
+    LL_SPI_SetMode(SPI4, LL_SPI_MODE_MASTER);
+    LL_SPI_SetStandard(SPI4, LL_SPI_PROTOCOL_MOTOROLA);
+    LL_SPI_SetTransferDirection(SPI4, LL_SPI_SIMPLEX_TX);
+    LL_SPI_SetDataWidth(SPI4, LL_SPI_DATAWIDTH_8BIT);
+    LL_SPI_SetClockPolarity(SPI4, LL_SPI_POLARITY_LOW);
+    LL_SPI_SetClockPhase(SPI4, LL_SPI_PHASE_1EDGE);
+    LL_SPI_SetNSSMode(SPI4, LL_SPI_NSS_SOFT);
+    LL_SPI_SetBaudRatePrescaler(SPI4, LL_SPI_BAUDRATEPRESCALER_DIV64);
+    LL_SPI_SetTransferBitOrder(SPI4, LL_SPI_MSB_FIRST);
+    LL_SPI_SetFIFOThreshold(SPI4, LL_SPI_FIFO_TH_01DATA);
 }
 
 static void MX_DMA_Init(void) {
@@ -180,13 +185,28 @@ static void MX_GPIO_Init(void) {
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOD);
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOE);
 
-    /* SPI1 GPIO: PA5 (SCK), PA6 (MISO), PA7 (MOSI) */
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_5, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_5, LL_GPIO_AF_5);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_6, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_6, LL_GPIO_AF_5);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_7, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_7, LL_GPIO_AF_5);
+
+    /* RST pin. PE15 */
+    LL_GPIO_SetPinMode(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinSpeed(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin, LL_GPIO_SPEED_FREQ_LOW);
+    LL_GPIO_SetPinPull(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin, LL_GPIO_PULL_NO);
+    LL_GPIO_SetPinOutputType(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin); // High: Inactive
+
+    /* MODE Pin. PE11 */
+    //ALSO WE NEED TO PULL THIS HIGH EXTERNALLY. SO 3060 FINDS IT IN CORRECT MODE AT BOOT
+    LL_GPIO_SetPinMode(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinSpeed(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_SPEED_FREQ_LOW);
+    LL_GPIO_SetPinPull(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_PULL_UP);
+    LL_GPIO_SetPinOutputType(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetOutputPin(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin); // High: Inactive
+
+
+    /* SPI4 GPIO: PE12 (SCK), PE14 (MOSI) */
+    LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_12, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetAFPin_8_15(GPIOE, LL_GPIO_PIN_12, LL_GPIO_AF_5);
+    LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_14, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetAFPin_8_15(GPIOE, LL_GPIO_PIN_14, LL_GPIO_AF_5);
 
     /* SPI1 CS: PD14 */
     LL_GPIO_SetPinMode(GPIOD, LL_GPIO_PIN_14, LL_GPIO_MODE_OUTPUT);

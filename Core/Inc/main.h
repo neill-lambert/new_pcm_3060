@@ -17,6 +17,11 @@ extern "C" {
 
 void Error_Handler(void);
 
+#define PCM3060_RST_Pin LL_GPIO_PIN_15
+#define PCM3060_RST_GPIO_Port GPIOE
+#define PCM3060_MODE_Pin LL_GPIO_PIN_11
+#define PCM3060_MODE_GPIO_Port GPIOE
+
 #ifdef __cplusplus
 }
 #endif

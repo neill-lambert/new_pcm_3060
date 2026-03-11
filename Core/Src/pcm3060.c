@@ -36,5 +36,7 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
     PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_CTRL1, 0x01); 
 
     // Configure ADC Control 1: I2S format, 24-bit
-    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_CTRL1, 0x01); 
+    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_CTRL1, 0x01);
+
+    //config wait until txe empty here.
 }
