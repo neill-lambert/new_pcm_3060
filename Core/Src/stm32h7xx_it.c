@@ -158,13 +158,13 @@ void DMA1_Stream0_IRQHandler(void)
   {
     LL_DMA_ClearFlag_HT0(DMA1);
     /* Clean the first half of the TX buffer to ensure DMA sees CPU updates */
-    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], AUDIO_BUFFER_SIZE * 2);
+    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
   if (LL_DMA_IsActiveFlag_TC0(DMA1))
   {
     LL_DMA_ClearFlag_TC0(DMA1);
     /* Clean the second half of the TX buffer to ensure DMA sees CPU updates */
-    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], AUDIO_BUFFER_SIZE * 2);
+    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
 }
 
@@ -177,13 +177,13 @@ void DMA1_Stream1_IRQHandler(void)
   {
     LL_DMA_ClearFlag_HT1(DMA1);
     /* Invalidate the first half of the RX buffer to ensure CPU sees DMA updates */
-    SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[0], AUDIO_BUFFER_SIZE * 2);
+    SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
   if (LL_DMA_IsActiveFlag_TC1(DMA1))
   {
     LL_DMA_ClearFlag_TC1(DMA1);
     /* Invalidate the second half of the RX buffer to ensure CPU sees DMA updates */
-    SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], AUDIO_BUFFER_SIZE * 2);
+    SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
 }
 

@@ -24,8 +24,8 @@
 
 /* Audio Buffers */
 #define AUDIO_BUFFER_SIZE 512
-__attribute__((section(".ARM.__at_0x24000000"))) int32_t tx_buffer[AUDIO_BUFFER_SIZE];
-__attribute__((section(".ARM.__at_0x24000100"))) int32_t rx_buffer[AUDIO_BUFFER_SIZE];
+__attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
+__attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
 /* Private function prototypes */
 void SystemClock_Config(void);
@@ -35,8 +35,20 @@ static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
 
 int main(void) {
+    /* Enable I-Cache and D-Cache */
+    SCB_EnableICache();
+    SCB_EnableDCache();
+
+    /* Set Priority Grouping */
+    NVIC_SetPriorityGrouping(3); // NVIC_PRIORITYGROUP_4: 4 bits for pre-emption priority
+
     /* System initialization */
     SystemClock_Config();
+    // PWR->CR3 |= PWR_CR3_LDOEN;
+    // while(!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY));
+
+    /* Configure SysTick to 1ms for LL_mDelay */
+    LL_Init1msTick(491520000);
 
     //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
@@ -50,8 +62,6 @@ int main(void) {
     LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
     LL_mDelay(10);
 
-    LL_SPI_Enable(SPI4);
-    LL_SPI_StartMasterTransfer(SPI4);
     PCM3060_Init(SPI4);
 
     /* Start Audio Streaming via SAI DMA (TDM mode) */
@@ -111,7 +121,7 @@ static void MX_SAI1_Init(void) {
     SAI1_Block_A->SLOTR = (0 << SAI_xSLOTR_FBOFF_Pos) |
                           (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 2: 32-bit
                           ((2 - 1) << SAI_xSLOTR_NBSLOT_Pos) |
-                          (0xFFFF0000); // SLOTEN bits (usually top 16 bits)
+                          SAI_xSLOTR_SLOTEN; // Enable all slots (or at least first 2)
 
     /* SAI1_Block_B: Receive (Slave) */
     SAI1_Block_B->CR1 = 0; // Disable
@@ -126,9 +136,22 @@ static void MX_SAI1_Init(void) {
 }
 
 static void MX_SPI4_Init(void) {
-    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI4);
+    RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
+    __DSB();
+    (void)RCC->APB2ENR;
+    RCC->D2CCIP1R &= ~RCC_D2CCIP1R_SPI45SEL; // Clear bits 28-30
+    RCC->D2CCIP1R |= (0x3 << RCC_D2CCIP1R_SPI45SEL_Pos); // Set to 0b011
+
+    LL_SPI_Disable(SPI4);
+    SPI4->IFCR = 0xFFFFFFFF;
+
+    LL_SPI_SetNSSMode(SPI4, LL_SPI_NSS_SOFT);
+    LL_SPI_SetInternalSSLevel(SPI4, LL_SPI_SS_LEVEL_HIGH);
 
     LL_SPI_SetMode(SPI4, LL_SPI_MODE_MASTER);
+    //LL_SPI_ClearFlag_MODF(SPI4);
+    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI4);
+    __DSB(); // Assembly barrier
     LL_SPI_SetStandard(SPI4, LL_SPI_PROTOCOL_MOTOROLA);
     LL_SPI_SetTransferDirection(SPI4, LL_SPI_SIMPLEX_TX);
     LL_SPI_SetDataWidth(SPI4, LL_SPI_DATAWIDTH_8BIT);
@@ -138,6 +161,8 @@ static void MX_SPI4_Init(void) {
     LL_SPI_SetBaudRatePrescaler(SPI4, LL_SPI_BAUDRATEPRESCALER_DIV64);
     LL_SPI_SetTransferBitOrder(SPI4, LL_SPI_MSB_FIRST);
     LL_SPI_SetFIFOThreshold(SPI4, LL_SPI_FIFO_TH_01DATA);
+    LL_SPI_Enable(SPI4);
+    LL_SPI_ClearFlag_MODF(SPI4);
 }
 
 static void MX_DMA_Init(void) {
@@ -205,24 +230,37 @@ static void MX_GPIO_Init(void) {
     /* SPI4 GPIO: PE12 (SCK), PE14 (MOSI) */
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_12, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOE, LL_GPIO_PIN_12, LL_GPIO_AF_5);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_12, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_14, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOE, LL_GPIO_PIN_14, LL_GPIO_AF_5);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_14, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
     /* SPI1 CS: PD14 */
     LL_GPIO_SetPinMode(GPIOD, LL_GPIO_PIN_14, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinSpeed(GPIOD, LL_GPIO_PIN_14, LL_GPIO_SPEED_FREQ_VERY_HIGH);
     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
 
     /* SAI1 GPIO: PE2 (MCLK), PE4 (FS), PE5 (SCK), PE6 (SD_A), PE3 (SD_B) */
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_2, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_2, LL_GPIO_AF_6);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_2, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_3, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_3, LL_GPIO_AF_6);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_3, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_4, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_4, LL_GPIO_AF_6);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_4, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_5, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_5, LL_GPIO_AF_6);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_5, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_6, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_6, LL_GPIO_AF_6);
+    LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_6, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 }
 
 void SystemClock_Config(void) {

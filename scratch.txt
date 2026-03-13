@@ -1,0 +1,21 @@
+protocol    h7 pin      h7 name     pcm3060 name    pcm3060 pin
+---------------------------------------------------------------
+spi4        pe12        spi sck     mc/scl/fmt      1
+            pe14        mosi        md/sda/demp     2
+            pd14        cs          ms/adr/ifmd     27
+            ------------------------------------------
+            pe13        miso        dout            25. this is left undone.
+            because on the 3060, dout is shared with miso. so we config this
+            write only. could be a problem during debug...
+ --------------------------------------------------------------
+ sai1       pe2         sai mck     sck1/2          6 tied to 9.
+            pe4         sai fs      lrck1/2         4 / 11.
+            pe5         sai sck     bclk1/2         5 / 10.
+            pe6         sda         din             12.
+            pe3         sdb         dout            3.
+ --------------------------------------------------------------
+ rst        pe15        rst         rst             15.
+ mode       pe11        mode        mode            28.
+ vcom       gnd         gnd         vcom            21.
+ (with 10uF tantalum or electro and 0.1uF ceramic capacitors in parallel).
+
