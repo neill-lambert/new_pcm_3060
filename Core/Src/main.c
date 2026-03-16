@@ -33,6 +33,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
+static void mySimpleWrite(void);
 
 int main(void) {
     /* Enable I-Cache and D-Cache */
@@ -52,6 +53,110 @@ int main(void) {
 
     //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
+    // // disable
+    // // reset SPI4 via RCC
+    // RCC->APB2RSTR |=  RCC_APB2RSTR_SPI4RST;
+    // __NOP();
+    // RCC->APB2RSTR &= ~RCC_APB2RSTR_SPI4RST;
+    // __NOP();
+    //
+    // // re-enable clock
+    // RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
+    // __NOP();
+    // (void)RCC->APB2ENR;
+    // write MASTER alone first
+    // SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
+    // SPI4->CFG2 |= SPI_CFG2_SP_0;
+    //
+    // SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
+    // SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
+    // SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
+    // SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
+    //
+    // // SPI4->CFG2 |= SPI_CFG2_SP_0;
+    // // SPI4->CR1 |= SPI_CR1_SSI;
+    // // SPI4->CFG2 |= SPI_CFG2_SSM;
+    // // SPI4->CFG2 |= SPI_CFG2_SSOE;
+    // // __NOP();
+    // // SPI4->CFG2 = SPI_CFG2_MASTER;
+    // // SPI4->CR1 |= SPI_CR1_SPE;
+    // // __NOP();
+    // SPI4->CR1 |= SPI_CR1_CSTART;
+    // __NOP();
+    // uint32_t cfg2_check = SPI4->CFG2;  // breakpoint - does MASTER set in isolation?
+    // uint32_t dummy = 0;
+    //
+    // uint32_t apb2enr_check = RCC->APB2ENR;  // breakpoint here
+    // // is bit 13 set?
+    //
+    // // now write CFG2 to a freshly reset peripheral
+    // SPI4->CFG2 = SPI_CFG2_MASTER
+    //            | SPI_CFG2_SSM
+    //            | SPI_CFG2_AFCNTR
+    //            | SPI_CFG2_SSOM;
+    //
+    // SPI4->CR1 &= ~SPI_CR1_SPE;
+    // SPI4->IFCR = 0xFFFFFFFF;
+    // // CFG1: DSIZE=7 (8bit), FTHLV=0 (1 data), MBR=5 (div64)
+    // SPI4->CFG1 = (5 << SPI_CFG1_MBR_Pos) | (7 << SPI_CFG1_DSIZE_Pos);
+    // // CFG2: MASTER, SSM, full duplex, Motorola, CPOL=0, CPHA=0, MSB first
+    // SPI4->CFG2 = SPI_CFG2_MASTER | SPI_CFG2_SSM | SPI_CFG2_AFCNTR | SPI_CFG2_SSOM;
+    // // TSIZE=2
+    // SPI4->CR2 = 1;
+    // // SSI high
+    // SPI4->CR1 = SPI_CR1_SSI;
+    // __DSB();
+    // (void)SPI4->CR1;
+    // __NOP(); __NOP(); __NOP(); __NOP();  // let SPE settle
+    // // enable
+    // SPI4->CR1 |= SPI_CR1_SPE ;
+    // __DSB();
+    // (void)SPI4->CR1;
+    //
+    //
+    // uint32_t cr2_check = SPI4->CR2;  // should be 1, breakpoint here
+    //
+    // *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
+    // SPI4->CR1 |= SPI_CR1_CSTART;
+    //
+    // // verify MODF is clear before proceeding
+    // if (SPI4->SR & SPI_SR_MODF) {
+    //     SPI4->IFCR |= SPI_IFCR_MODFC;  // clear it
+    //     SPI4->CR1  |= SPI_CR1_SPE;     // re-enable
+    // }
+    //
+    //
+    // SPI4->CR2 = 1;  // re-set TSIZE as SPE cycle may clear it
+    //
+    // // CS low
+    // LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
+    // __DSB();
+    // __NOP(); __NOP(); __NOP(); __NOP();  // let SPE settle
+    //
+    // // write both bytes
+    // while (!(SPI4->SR & SPI_SR_TXP));
+    // *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
+    // while (!(SPI4->SR & SPI_SR_TXP));
+    // *(volatile uint8_t *)&SPI4->TXDR = 0x55;
+    // // start
+    // SPI4->CR1 |= SPI_CR1_CSTART;
+    // __DSB();
+    // __NOP();
+    // uint32_t cr1  = SPI4->CR1;
+    // uint32_t cr2  = SPI4->CR2;
+    // uint32_t cfg1 = SPI4->CFG1;
+    // uint32_t cfg2 = SPI4->CFG2;
+    // uint32_t sr   = SPI4->SR;
+    // // breakpoint here
+    // dummy = 0;
+    // // put breakpoint here and read sr_after_cstart
+    //
+    // while (!(SPI4->SR & SPI_SR_EOT));
+    // SPI4->IFCR |= SPI_IFCR_EOTC;
+
+    // CS high
+   // LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
+
     MX_DMA_Init();
     MX_SPI4_Init();
     MX_SAI1_Init();
@@ -61,9 +166,9 @@ int main(void) {
     LL_mDelay(10);
     LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
     LL_mDelay(10);
+    mySimpleWrite();
 
     PCM3060_Init(SPI4);
-
     /* Start Audio Streaming via SAI DMA (TDM mode) */
 
     /* SAI1 Block A (TX) DMA Start */
@@ -136,12 +241,15 @@ static void MX_SAI1_Init(void) {
 }
 
 static void MX_SPI4_Init(void) {
-    RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
-    __DSB();
-    (void)RCC->APB2ENR;
-    RCC->D2CCIP1R &= ~RCC_D2CCIP1R_SPI45SEL; // Clear bits 28-30
-    RCC->D2CCIP1R |= (0x3 << RCC_D2CCIP1R_SPI45SEL_Pos); // Set to 0b011
 
+    //this seems the order for ssm/master config without triggering modf
+    // SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
+    // SPI4->CFG2 |= SPI_CFG2_SP_0;
+    //
+    // SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
+    // SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
+    // SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
+    // SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
     LL_SPI_Disable(SPI4);
     SPI4->IFCR = 0xFFFFFFFF;
 
@@ -149,9 +257,6 @@ static void MX_SPI4_Init(void) {
     LL_SPI_SetInternalSSLevel(SPI4, LL_SPI_SS_LEVEL_HIGH);
 
     LL_SPI_SetMode(SPI4, LL_SPI_MODE_MASTER);
-    //LL_SPI_ClearFlag_MODF(SPI4);
-    LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI4);
-    __DSB(); // Assembly barrier
     LL_SPI_SetStandard(SPI4, LL_SPI_PROTOCOL_MOTOROLA);
     LL_SPI_SetTransferDirection(SPI4, LL_SPI_SIMPLEX_TX);
     LL_SPI_SetDataWidth(SPI4, LL_SPI_DATAWIDTH_8BIT);
@@ -163,6 +268,17 @@ static void MX_SPI4_Init(void) {
     LL_SPI_SetFIFOThreshold(SPI4, LL_SPI_FIFO_TH_01DATA);
     LL_SPI_Enable(SPI4);
     LL_SPI_ClearFlag_MODF(SPI4);
+    //toggle cs
+    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);  // CS low
+    LL_SPI_TransmitData8(SPI4, 0x0);
+    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);    // CS high
+    SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
+    //SPI4->CFG2 |= SPI_CFG2_SP_0;
+
+    SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
+    SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
+    SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
+    SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
 }
 
 static void MX_DMA_Init(void) {
@@ -220,7 +336,7 @@ static void MX_GPIO_Init(void) {
 
     /* MODE Pin. PE11 */
     //ALSO WE NEED TO PULL THIS HIGH EXTERNALLY. SO 3060 FINDS IT IN CORRECT MODE AT BOOT
-    LL_GPIO_SetPinMode(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinMode(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_MODE_ANALOG);
     LL_GPIO_SetPinSpeed(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_SPEED_FREQ_LOW);
     LL_GPIO_SetPinPull(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_PULL_UP);
     LL_GPIO_SetPinOutputType(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_OUTPUT_PUSHPULL);
@@ -230,15 +346,19 @@ static void MX_GPIO_Init(void) {
     /* SPI4 GPIO: PE12 (SCK), PE14 (MOSI) */
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_12, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOE, LL_GPIO_PIN_12, LL_GPIO_AF_5);
+    LL_GPIO_SetPinOutputType(GPIOE, LL_GPIO_PIN_12, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_12, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_14, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOE, LL_GPIO_PIN_14, LL_GPIO_AF_5);
+    LL_GPIO_SetPinOutputType(GPIOE, LL_GPIO_PIN_14, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_14, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
     /* SPI1 CS: PD14 */
     LL_GPIO_SetPinMode(GPIOD, LL_GPIO_PIN_14, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinSpeed(GPIOD, LL_GPIO_PIN_14, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    LL_GPIO_SetPinOutputType(GPIOD, LL_GPIO_PIN_14, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinPull(GPIOD, LL_GPIO_PIN_14, LL_GPIO_PULL_UP); //or modf persists even tho we are using software nss.
     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
 
     /* SAI1 GPIO: PE2 (MCLK), PE4 (FS), PE5 (SCK), PE6 (SD_A), PE3 (SD_B) */
@@ -269,6 +389,8 @@ void SystemClock_Config(void) {
 
     LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
     while (LL_PWR_IsActiveFlag_VOS() == 0);
+    // ALSO wait for VOS0 ready in D3CR (H723 RevZ requirement)
+    while ((PWR->D3CR & PWR_D3CR_VOSRDY) == 0);
 
     /* Enable HSE */
     LL_RCC_HSE_Enable();
@@ -311,6 +433,41 @@ void SystemClock_Config(void) {
     LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_2);
     LL_RCC_SetAPB3Prescaler(LL_RCC_APB3_DIV_2);
     LL_RCC_SetAPB4Prescaler(LL_RCC_APB4_DIV_2);
+
+    // kernel clock source first
+    RCC->D2CCIP1R &= ~RCC_D2CCIP1R_SPI45SEL; //0b000 =apb2
+    RCC->D2CCIP1R |= (0x3 << RCC_D2CCIP1R_SPI45SEL_Pos);  // HSE
+    __NOP();
+    RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
+    __NOP();
+    (void)RCC->APB2ENR;  // dummy read to ensure clock is active
+
+    // verify immediately
+    if (!(RCC->APB2ENR & RCC_APB2ENR_SPI4EN)) {
+        // trap here if still not set
+        while(1);
+    }
+}
+
+
+
+
+
+
+static void mySimpleWrite(void){
+    // // CS low
+    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
+    // write both bytes
+    while (!(SPI4->SR & SPI_SR_TXP));
+    *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
+    while (!(SPI4->SR & SPI_SR_TXP));
+    *(volatile uint8_t *)&SPI4->TXDR = 0x55;
+    // start
+    SPI4->CR1 |= SPI_CR1_CSTART;
+    __DSB();
+    __NOP();
+    //CS high
+    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
 }
 
 void Error_Handler(void) {

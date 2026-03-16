@@ -1,4 +1,6 @@
 #include "pcm3060.h"
+
+#include "stm32h7xx_ll_gpio.h"
 #include "stm32h7xx_ll_utils.h"
 
 // Indices 0–9 map to registers 64–73
@@ -23,19 +25,37 @@ static uint8_t pcm3060_shadow[10] = {
  * @brief Write data to PCM3060 register via SPI
  */
 void PCM3060_WriteReg(SPI_TypeDef *SPIx, uint8_t reg, uint8_t data) {
-
+    //
+    // pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
+    // LL_SPI_Disable(SPIx);
+    // SPIx->IFCR = 0xFFFFFFFF; // Clear EOT, TXC, and all error flags
+    // LL_SPI_SetTransferSize(SPIx, 2);
+    // LL_SPI_SetTransferDirection(SPIx, LL_SPI_SIMPLEX_TX);
+    // LL_SPI_Enable(SPIx);
+    // LL_SPI_StartMasterTransfer(SPIx);
+    // LL_SPI_TransmitData8(SPIx, reg & 0x7F);
+    // LL_mDelay(10);
+    // LL_SPI_TransmitData8(SPIx, data);          // actual data value
+    // while(!LL_SPI_IsActiveFlag_EOT(SPIx));
+    // LL_SPI_ClearFlag_EOT(SPIx);
+    //
+    /////////////////////////////////////
     pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
     LL_SPI_Disable(SPIx);
-    SPIx->IFCR = 0xFFFFFFFF; // Clear EOT, TXC, and all error flags
-    LL_SPI_SetTransferSize(SPIx, 2);
-    LL_SPI_SetTransferDirection(SPIx, LL_SPI_SIMPLEX_TX);
+    SPIx->IFCR = 0xFFFFFFFF;
+    LL_SPI_SetTransferDirection(SPIx, LL_SPI_FULL_DUPLEX);    LL_SPI_SetTransferSize(SPIx, 2);
     LL_SPI_Enable(SPIx);
+
+
+    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);  // CS low
     LL_SPI_StartMasterTransfer(SPIx);
+    while (!LL_SPI_IsActiveFlag_TXP(SPIx));
     LL_SPI_TransmitData8(SPIx, reg & 0x7F);
-    LL_mDelay(10);
-    LL_SPI_TransmitData8(SPIx, data);          // actual data value
-    while(!LL_SPI_IsActiveFlag_EOT(SPIx));
+    while (!LL_SPI_IsActiveFlag_TXP(SPIx));
+    LL_SPI_TransmitData8(SPIx, data);
+    while (!LL_SPI_IsActiveFlag_EOT(SPIx));
     LL_SPI_ClearFlag_EOT(SPIx);
+    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);    // CS high
 }
 
 
