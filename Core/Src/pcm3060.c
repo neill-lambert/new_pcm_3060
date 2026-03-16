@@ -40,22 +40,63 @@ void PCM3060_WriteReg(SPI_TypeDef *SPIx, uint8_t reg, uint8_t data) {
     // LL_SPI_ClearFlag_EOT(SPIx);
     //
     /////////////////////////////////////
+
+    //orig mysimplewrite
     pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
     LL_SPI_Disable(SPIx);
     SPIx->IFCR = 0xFFFFFFFF;
-    LL_SPI_SetTransferDirection(SPIx, LL_SPI_FULL_DUPLEX);    LL_SPI_SetTransferSize(SPIx, 2);
+    LL_SPI_SetTransferDirection(SPIx, LL_SPI_FULL_DUPLEX);    LL_SPI_SetTransferSize(SPIx, 2); //maybe adjust tx dir to simplextx
     LL_SPI_Enable(SPIx);
+    // CS low
+    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
+    //orig spi init config. correct order
+    SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
+    //SPI4->CFG2 |= SPI_CFG2_SP_0;      // ti or motorola std? not sure. leave as moto
 
+    SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
+    SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
+    SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
+    SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
 
-    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);  // CS low
-    LL_SPI_StartMasterTransfer(SPIx);
-    while (!LL_SPI_IsActiveFlag_TXP(SPIx));
-    LL_SPI_TransmitData8(SPIx, reg & 0x7F);
-    while (!LL_SPI_IsActiveFlag_TXP(SPIx));
-    LL_SPI_TransmitData8(SPIx, data);
-    while (!LL_SPI_IsActiveFlag_EOT(SPIx));
-    LL_SPI_ClearFlag_EOT(SPIx);
-    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);    // CS high
+    //now line up data to xfer.
+    // write both bytes
+    while (!(SPI4->SR & SPI_SR_TXP));
+    *(volatile uint8_t *)&SPI4->TXDR = reg & 0x7F; //important cast. leave. otherwise spi starts assuming to look for 32bit frames.
+    while (!(SPI4->SR & SPI_SR_TXP));
+    *(volatile uint8_t *)&SPI4->TXDR = data;
+    // start
+    SPI4->CR1 |= SPI_CR1_CSTART;
+    __DSB();
+    __NOP(); //not sure?
+    //CS high
+    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
+
+//     //orig spi init config. correct order
+//     SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
+//     //SPI4->CFG2 |= SPI_CFG2_SP_0;
+//
+//     SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
+//     SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
+//     SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
+//     SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
+//
+//     //orig faulty writreg
+//     pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
+//     LL_SPI_Disable(SPIx);
+//     SPIx->IFCR = 0xFFFFFFFF;
+//     LL_SPI_SetTransferDirection(SPIx, LL_SPI_FULL_DUPLEX);    LL_SPI_SetTransferSize(SPIx, 2);
+//     LL_SPI_Enable(SPIx);
+//
+//
+//     LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);  // CS low
+//     LL_SPI_StartMasterTransfer(SPIx);
+//     while (!LL_SPI_IsActiveFlag_TXP(SPIx));
+//     LL_SPI_TransmitData8(SPIx, reg & 0x7F);
+//     while (!LL_SPI_IsActiveFlag_TXP(SPIx));
+//     LL_SPI_TransmitData8(SPIx, data);
+//     while (!LL_SPI_IsActiveFlag_EOT(SPIx));
+//     LL_SPI_ClearFlag_EOT(SPIx);
+//     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);    // CS high
 }
 
 

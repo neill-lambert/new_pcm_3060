@@ -19,3 +19,4 @@ spi4        pe12        spi sck     mc/scl/fmt      1
  vcom       gnd         gnd         vcom            21.
  (with 10uF tantalum or electro and 0.1uF ceramic capacitors in parallel).
 
+todos.
