@@ -25,31 +25,13 @@ static uint8_t pcm3060_shadow[10] = {
  * @brief Write data to PCM3060 register via SPI
  */
 void PCM3060_WriteReg(SPI_TypeDef *SPIx, uint8_t reg, uint8_t data) {
-    //
-    // pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
-    // LL_SPI_Disable(SPIx);
-    // SPIx->IFCR = 0xFFFFFFFF; // Clear EOT, TXC, and all error flags
-    // LL_SPI_SetTransferSize(SPIx, 2);
-    // LL_SPI_SetTransferDirection(SPIx, LL_SPI_SIMPLEX_TX);
-    // LL_SPI_Enable(SPIx);
-    // LL_SPI_StartMasterTransfer(SPIx);
-    // LL_SPI_TransmitData8(SPIx, reg & 0x7F);
-    // LL_mDelay(10);
-    // LL_SPI_TransmitData8(SPIx, data);          // actual data value
-    // while(!LL_SPI_IsActiveFlag_EOT(SPIx));
-    // LL_SPI_ClearFlag_EOT(SPIx);
-    //
-    /////////////////////////////////////
-
-    //orig mysimplewrite
     pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
     LL_SPI_Disable(SPIx);
     SPIx->IFCR = 0xFFFFFFFF;
-    LL_SPI_SetTransferDirection(SPIx, LL_SPI_FULL_DUPLEX);    LL_SPI_SetTransferSize(SPIx, 2); //maybe adjust tx dir to simplextx
+    LL_SPI_SetTransferDirection(SPIx, LL_SPI_SIMPLEX_TX);    LL_SPI_SetTransferSize(SPIx, 2); //maybe adjust tx dir to simplextx
     LL_SPI_Enable(SPIx);
     // CS low
     LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
-    //orig spi init config. correct order
     SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
     //SPI4->CFG2 |= SPI_CFG2_SP_0;      // ti or motorola std? not sure. leave as moto
 
@@ -67,36 +49,11 @@ void PCM3060_WriteReg(SPI_TypeDef *SPIx, uint8_t reg, uint8_t data) {
     // start
     SPI4->CR1 |= SPI_CR1_CSTART;
     __DSB();
-    __NOP(); //not sure?
+    while(!LL_SPI_IsActiveFlag_EOT(SPIx));
+    LL_SPI_ClearFlag_EOT(SPIx);
+    __DSB();
     //CS high
     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
-
-//     //orig spi init config. correct order
-//     SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
-//     //SPI4->CFG2 |= SPI_CFG2_SP_0;
-//
-//     SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
-//     SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
-//     SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
-//     SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
-//
-//     //orig faulty writreg
-//     pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;  // keep shadow in sync
-//     LL_SPI_Disable(SPIx);
-//     SPIx->IFCR = 0xFFFFFFFF;
-//     LL_SPI_SetTransferDirection(SPIx, LL_SPI_FULL_DUPLEX);    LL_SPI_SetTransferSize(SPIx, 2);
-//     LL_SPI_Enable(SPIx);
-//
-//
-//     LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);  // CS low
-//     LL_SPI_StartMasterTransfer(SPIx);
-//     while (!LL_SPI_IsActiveFlag_TXP(SPIx));
-//     LL_SPI_TransmitData8(SPIx, reg & 0x7F);
-//     while (!LL_SPI_IsActiveFlag_TXP(SPIx));
-//     LL_SPI_TransmitData8(SPIx, data);
-//     while (!LL_SPI_IsActiveFlag_EOT(SPIx));
-//     LL_SPI_ClearFlag_EOT(SPIx);
-//     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);    // CS high
 }
 
 
@@ -114,27 +71,37 @@ void PCM3060_SetBit(SPI_TypeDef *SPIx, uint8_t reg, uint8_t bit) {
 
 void PCM3060_Init(SPI_TypeDef *SPIx) {
     // Perform Software Reset (MRST) (register 64?)
-    PCM3060_ClearBit(SPIx, 64, 7);
-    PCM3060_ClearBit(SPIx, 64, 6);
-    LL_mDelay(10);
+   // PCM3060_ClearBit(SPIx, 64, 7);
+    //__DSB();
+    //PCM3060_ClearBit(SPIx, 64, 6);
+    //__DSB();
+    //LL_mDelay(10);
 
-    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0x00);
-    LL_mDelay(10); 
-
+    //PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0); //check this val???
+    //LL_mDelay(10);
     // Release Reset and set Dual Speed mode (ADPS/DAPS = 01)
-    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xD2); 
+//    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0x00);
+//    __DSB();
+//
+//    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xFF);
+//    __DSB();
 
-    // Configure DAC Control 1: I2S format, 24-bit
-    PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_CTRL1, 0x01); 
+    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0);
+    __DSB();
 
-    // Configure DAC Control 2: Unmute DAC
-    PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_CTRL2, 0x00);
+    PCM3060_WriteReg(SPIx, PCM3060_REG_CLOCK_SEL, 0x01);
+    __DSB();
+    //configure dac ctrl1. attenuation l. all ffs. no at.
+    PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_ATTEN_L, 0xFF);
 
-    // Configure ADC Control 1: I2S format, 24-bit
-    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_CTRL1, 0x01);
+    //configure dac ctrl1. attenuation r. all ffs. no at.
+    PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_ATTEN_R, 0xFF);
 
-    // Configure ADC Control 2: Unmute ADC
-    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_CTRL2, 0x00);
+    // Configure ADC Control 2: attenuation l. 1101 0111b 215 = 0db.
+    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_L, 0xD7);
+
+    // Configure ADC Control 2: attenuation r. 1101 0111b 215 = 0db.
+    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_R, 0xD7);
 
     //config wait until txe empty here.
 }

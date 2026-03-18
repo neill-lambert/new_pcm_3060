@@ -183,6 +183,7 @@ void DMA1_Stream1_IRQHandler(void)
   {
     LL_DMA_ClearFlag_TC1(DMA1);
     /* Invalidate the second half of the RX buffer to ensure CPU sees DMA updates */
+
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
 }

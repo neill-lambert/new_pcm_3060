@@ -166,6 +166,12 @@ SECTIONS
     . = ALIGN(8);
   } >RAM_D1
 
+  .sram1_data (NOLOAD) :
+  {
+    . = ALIGN(32);
+    *(.sram1_data)
+    . = ALIGN(32);
+  } > RAM_D2
   /* Remove information from the standard libraries */
   /DISCARD/ :
   {

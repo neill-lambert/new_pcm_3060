@@ -19,13 +19,16 @@
 #include <stdint.h>
 
 #include "main.h"
+
+#include <string.h>
+
 #include "pcm3060.h"
 
 
 /* Audio Buffers */
 #define AUDIO_BUFFER_SIZE 512
-__attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
-__attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
+__attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
+__attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
 /* Private function prototypes */
 void SystemClock_Config(void);
@@ -33,130 +36,58 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
-static void mySimpleWrite(void);
+//static void mySimpleWrite(void);
 
 int main(void) {
-    /* Enable I-Cache and D-Cache */
-    SCB_EnableICache();
-    SCB_EnableDCache();
 
+	PWR->CR3 = (PWR->CR3 & ~(PWR_CR3_BYPASS | PWR_CR3_LDOEN));
+    while(!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY));
+
+    PWR->D3CR |= PWR_D3CR_VOS; // Set to VOS0
+    while (!(PWR->D3CR & PWR_D3CR_VOSRDY));
+
+    // 1. Set the Power Voltage Scaling to Scale 1
+    LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE1);
+
+    // 2. Wait for the VOSRDY flag
+	while (LL_PWR_IsActiveFlag_VOS() == 0);
+
+    // 3. Enable the VOS0 (Scale 0) for boosted performance
+    LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
+
+    // 4. Wait for the VOSRDY flag again
+	while (LL_PWR_IsActiveFlag_VOS() == 0);
+
+
+    // Use a simple loop to force the ECC to initialize
+    for(int i=0; i < AUDIO_BUFFER_SIZE; i++) {
+        rx_buffer[i] = 0;
+        tx_buffer[i] = 0x12345678;
+    }
+    __DSB(); // Ensure writes are finished
+   // SCB_DisableDCache();//
+
+    // memset((void*)rx_buffer, 0, sizeof(rx_buffer));
+    // memset((void*)tx_buffer, 0, sizeof(tx_buffer));
+    /* Enable I-Cache and D-Cache */
+   // SCB_EnableICache();
+    //SCB_EnableDCache();
     /* Set Priority Grouping */
     NVIC_SetPriorityGrouping(3); // NVIC_PRIORITYGROUP_4: 4 bits for pre-emption priority
 
     /* System initialization */
+//    LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
+//	while (LL_PWR_IsActiveFlag_VOS() == 0);
+	// ALSO wait for VOS0 ready in D3CR (H723 RevZ requirement)
+	//while ((PWR->D3CR & PWR_D3CR_VOSRDY) == 0);
+
     SystemClock_Config();
-    // PWR->CR3 |= PWR_CR3_LDOEN;
-    // while(!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY));
 
     /* Configure SysTick to 1ms for LL_mDelay */
     LL_Init1msTick(491520000);
 
     //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
-    // // disable
-    // // reset SPI4 via RCC
-    // RCC->APB2RSTR |=  RCC_APB2RSTR_SPI4RST;
-    // __NOP();
-    // RCC->APB2RSTR &= ~RCC_APB2RSTR_SPI4RST;
-    // __NOP();
-    //
-    // // re-enable clock
-    // RCC->APB2ENR |= RCC_APB2ENR_SPI4EN;
-    // __NOP();
-    // (void)RCC->APB2ENR;
-    // write MASTER alone first
-    // SPI4->IFCR |= SPI_IFCR_MODFC;       // 1. Clear any old fault
-    // SPI4->CFG2 |= SPI_CFG2_SP_0;
-    //
-    // SPI4->CR1  |= SPI_CR1_SSI;          // 2. Force internal signal HIGH
-    // SPI4->CFG2 |= SPI_CFG2_SSM;         // 3. Enable Software Management
-    // SPI4->CFG2 |= SPI_CFG2_MASTER;      // 4. NOW set Master mode
-    // SPI4->CR1  |= SPI_CR1_SPE;          // 5. Enable SPI
-    //
-    // // SPI4->CFG2 |= SPI_CFG2_SP_0;
-    // // SPI4->CR1 |= SPI_CR1_SSI;
-    // // SPI4->CFG2 |= SPI_CFG2_SSM;
-    // // SPI4->CFG2 |= SPI_CFG2_SSOE;
-    // // __NOP();
-    // // SPI4->CFG2 = SPI_CFG2_MASTER;
-    // // SPI4->CR1 |= SPI_CR1_SPE;
-    // // __NOP();
-    // SPI4->CR1 |= SPI_CR1_CSTART;
-    // __NOP();
-    // uint32_t cfg2_check = SPI4->CFG2;  // breakpoint - does MASTER set in isolation?
-    // uint32_t dummy = 0;
-    //
-    // uint32_t apb2enr_check = RCC->APB2ENR;  // breakpoint here
-    // // is bit 13 set?
-    //
-    // // now write CFG2 to a freshly reset peripheral
-    // SPI4->CFG2 = SPI_CFG2_MASTER
-    //            | SPI_CFG2_SSM
-    //            | SPI_CFG2_AFCNTR
-    //            | SPI_CFG2_SSOM;
-    //
-    // SPI4->CR1 &= ~SPI_CR1_SPE;
-    // SPI4->IFCR = 0xFFFFFFFF;
-    // // CFG1: DSIZE=7 (8bit), FTHLV=0 (1 data), MBR=5 (div64)
-    // SPI4->CFG1 = (5 << SPI_CFG1_MBR_Pos) | (7 << SPI_CFG1_DSIZE_Pos);
-    // // CFG2: MASTER, SSM, full duplex, Motorola, CPOL=0, CPHA=0, MSB first
-    // SPI4->CFG2 = SPI_CFG2_MASTER | SPI_CFG2_SSM | SPI_CFG2_AFCNTR | SPI_CFG2_SSOM;
-    // // TSIZE=2
-    // SPI4->CR2 = 1;
-    // // SSI high
-    // SPI4->CR1 = SPI_CR1_SSI;
-    // __DSB();
-    // (void)SPI4->CR1;
-    // __NOP(); __NOP(); __NOP(); __NOP();  // let SPE settle
-    // // enable
-    // SPI4->CR1 |= SPI_CR1_SPE ;
-    // __DSB();
-    // (void)SPI4->CR1;
-    //
-    //
-    // uint32_t cr2_check = SPI4->CR2;  // should be 1, breakpoint here
-    //
-    // *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
-    // SPI4->CR1 |= SPI_CR1_CSTART;
-    //
-    // // verify MODF is clear before proceeding
-    // if (SPI4->SR & SPI_SR_MODF) {
-    //     SPI4->IFCR |= SPI_IFCR_MODFC;  // clear it
-    //     SPI4->CR1  |= SPI_CR1_SPE;     // re-enable
-    // }
-    //
-    //
-    // SPI4->CR2 = 1;  // re-set TSIZE as SPE cycle may clear it
-    //
-    // // CS low
-    // LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
-    // __DSB();
-    // __NOP(); __NOP(); __NOP(); __NOP();  // let SPE settle
-    //
-    // // write both bytes
-    // while (!(SPI4->SR & SPI_SR_TXP));
-    // *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
-    // while (!(SPI4->SR & SPI_SR_TXP));
-    // *(volatile uint8_t *)&SPI4->TXDR = 0x55;
-    // // start
-    // SPI4->CR1 |= SPI_CR1_CSTART;
-    // __DSB();
-    // __NOP();
-    // uint32_t cr1  = SPI4->CR1;
-    // uint32_t cr2  = SPI4->CR2;
-    // uint32_t cfg1 = SPI4->CFG1;
-    // uint32_t cfg2 = SPI4->CFG2;
-    // uint32_t sr   = SPI4->SR;
-    // // breakpoint here
-    // dummy = 0;
-    // // put breakpoint here and read sr_after_cstart
-    //
-    // while (!(SPI4->SR & SPI_SR_EOT));
-    // SPI4->IFCR |= SPI_IFCR_EOTC;
-
-    // CS high
-   // LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
-
     MX_DMA_Init();
     MX_SPI4_Init();
     MX_SAI1_Init();
@@ -166,19 +97,11 @@ int main(void) {
     LL_mDelay(10);
     LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
     LL_mDelay(10);
-    mySimpleWrite();
-
-    PCM3060_Init(SPI4);
+ //   mySimpleWrite();
+    for(int i=0; i<AUDIO_BUFFER_SIZE; i++) {
+        tx_buffer[i] = 0x12345678;
+    }
     /* Start Audio Streaming via SAI DMA (TDM mode) */
-
-    /* SAI1 Block A (TX) DMA Start */
-    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)tx_buffer);
-    LL_DMA_SetPeriphAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)&SAI1_Block_A->DR);
-    LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
-    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
-
-    SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
-    SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
 
     /* SAI1 Block B (RX) DMA Start */
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_1, (uint32_t)rx_buffer);
@@ -186,47 +109,108 @@ int main(void) {
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_1, AUDIO_BUFFER_SIZE);
     LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1);
 
+    /* SAI1 Block A (TX) DMA Start */
+    LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)tx_buffer);
+    LL_DMA_SetPeriphAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)&SAI1_Block_A->DR);
+    LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
+
+    PCM3060_Init(SPI4);
+    LL_mDelay(10);
+
+
     SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
     SAI1_Block_B->CR1 |= SAI_xCR1_SAIEN;
+
+    SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
+    SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
+    PCM3060_WriteReg(SPI4, 0x40, 0xC0);
+
+    LL_mDelay(10);
 
     while (1) {
         /* Simple loopback: copy rx to tx */
         for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-            tx_buffer[i] = rx_buffer[i];
+              tx_buffer[i] = rx_buffer[i];
+              //SCB_InvalidateDCache_by_Addr((uint32_t *)rx_buffer, sizeof(rx_buffer));
         }
     }
 }
 
 static void MX_SAI1_Init(void) {
-    LL_RCC_SetSAIClockSource(LL_RCC_SAI1_CLKSOURCE_PLL1Q);
+    // 1. Enable the Bus Clock (so you can talk to the registers)
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SAI1);
 
+    // 1. Ensure the SAI blocks are disabled
+    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
+    SAI1_Block_B->CR1 &= ~SAI_xCR1_SAIEN;
+
+    // 2. Perform the Peripheral Reset (Crucial to break the HSI lock)
+    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
+    for(volatile int i=0; i<5000; i++); // Long delay for the bus
+    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
+
+    //Ensure PLL1 is locked and DIVQ1EN is 1
+    while((!(RCC->CR & RCC_CR_PLL3RDY)));
+
+    //saisel to pll3p
+
+     RCC->D2CCIP1R &= ~(7U << 0);
+     RCC->D2CCIP1R |= (2U << 0);
+
+    // 3. Re-verify the Mux (PLL3_P is 0x2, 0b010)
+   // RCC->D2CCIP1R |= 0x2; // 010: PLL3_P
+    // 4. Force the mux to a different, active clock first (e.g., PLL2_P or HSI)
+   // MODIFY_REG(RCC->D2CCIP1R, RCC_D2CCIP1R_SAI1SEL, (1U << RCC_D2CCIP1R_SAI1SEL_Pos));
+    //for(volatile int i=0; i<1000; i++);
+
+    // 5. Now force it back to PLL1_Q (0x0)
+   // MODIFY_REG(RCC->D2CCIP1R, RCC_D2CCIP1R_SAI1SEL, 0);
+    // 6. Perform the Peripheral Reset
+    // This "un-sticks" the internal state machine
+//    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
+//    for(volatile int i=0; i<100; i++); // Short delay
+//    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
+
+    // 3. Force the Clock Mux (again, just to be safe)
+    //RCC->D2CCIP1R |= 0x2; // 010: PLL3_P
+    // 3. Set the Kernel Clock Source (PLL1P)
+    // Doing this after the reset ensures the Mux "takes" correctly
+    LL_RCC_SetSAIClockSource(LL_RCC_SAI1_CLKSOURCE_PLL3P);
+
+    while ((LL_APB2_GRP1_IsEnabledClock(LL_APB2_GRP1_PERIPH_SAI1))!=1);
     /* SAI1_Block_A: Transmit (Master) */
     SAI1_Block_A->CR1 = 0; // Disable
 
     // CR1: Asynchronous Master TX, I2S Free protocol, 24-bit
     SAI1_Block_A->CR1 = (0 << SAI_xCR1_MODE_Pos) | // 0: Master TX
                         (0 << SAI_xCR1_SYNCEN_Pos) | // 0: Asynchronous
-                        (5 << SAI_xCR1_DS_Pos) | // 5: 24-bit
+                        (7 << SAI_xCR1_DS_Pos) | // 5: 24-bit
                         (0 << SAI_xCR1_LSBFIRST_Pos) | // 0: MSB first
+                        (4 << 20) | // MCKDIV = 4 (for 96kHz with 98.304MHz SAI_CLK)
                         SAI_xCR1_MCKEN; // Master clock enable
 
     // CR2: FIFO Threshold, MCLK Divider
-    SAI1_Block_A->CR2 = (0 << SAI_xCR2_FTH_Pos) | // 0: Empty
-                        (4 << 20); // MCKDIV = 4 (for 96kHz with 98.304MHz SAI_CLK)
+    SAI1_Block_A->CR2 = (0 << SAI_xCR2_FTH_Pos); // 0: Empty
+
 
     // FRCR: Frame length = 64 (2 slots * 32 bits), Active frame length = 32 (FS high for 32 bits)
     SAI1_Block_A->FRCR = ((64 - 1) << SAI_xFRCR_FRL_Pos) |
                          ((32 - 1) << SAI_xFRCR_FSALL_Pos) |
                          SAI_xFRCR_FSDEF | // FS is channel identification
                          (0 << SAI_xFRCR_FSPOL_Pos) | // 0: FS active low (I2S standard)
-                         SAI_xFRCR_FSOFF; // FS 1 bit before data
+                            (SAI_xFRCR_FSOFF); // FS 1 bit before data
 
-    // SLOTR: 2 slots, each 32-bit, slots 0 and 1 active
+    // // SLOTR: 2 slots, each 32-bit, slots 0 and 1 active
+    // SAI1_Block_A->SLOTR = (0 << SAI_xSLOTR_FBOFF_Pos) |
+    //                       (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 2: 32-bit
+    //                       ((2 - 1) << SAI_xSLOTR_NBSLOT_Pos) |
+    //                       SAI_xSLOTR_SLOTEN; // Enable all slots (or at least first 2)
+    // Enable exactly Slot 0 and Slot 1
     SAI1_Block_A->SLOTR = (0 << SAI_xSLOTR_FBOFF_Pos) |
-                          (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 2: 32-bit
-                          ((2 - 1) << SAI_xSLOTR_NBSLOT_Pos) |
-                          SAI_xSLOTR_SLOTEN; // Enable all slots (or at least first 2)
+                          (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 32-bit
+                          (1 << SAI_xSLOTR_NBSLOT_Pos) | // 2 slots (N-1)
+                          (0x3U << 16);                 // SLOTEN[1:0] bits
 
     /* SAI1_Block_B: Receive (Slave) */
     SAI1_Block_B->CR1 = 0; // Disable
@@ -234,9 +218,10 @@ static void MX_SAI1_Init(void) {
     // CR1: Synchronous Slave RX, 24-bit
     SAI1_Block_B->CR1 = (3 << SAI_xCR1_MODE_Pos) | // 3: Slave RX
                         (1 << SAI_xCR1_SYNCEN_Pos) | // 1: Synchronous with other block
-                        (5 << SAI_xCR1_DS_Pos); // 5: 24-bit
+                        (7 << SAI_xCR1_DS_Pos); // 5: 24-bit
 
     SAI1_Block_B->FRCR = SAI1_Block_A->FRCR;
+
     SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
 }
 
@@ -285,7 +270,8 @@ static void MX_DMA_Init(void) {
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);
 
     /* SAI1_A DMA (TX) */
-    LL_DMA_ConfigAddresses(DMA1, LL_DMA_STREAM_0, 0, 0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+    LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+    //LL_DMA_ConfigAddresses(DMA1, LL_DMA_STREAM_0, 0, 0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
     LL_DMA_SetPeriphRequest(DMA1, LL_DMA_STREAM_0, LL_DMAMUX1_REQ_SAI1_A);
     LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH |
@@ -295,12 +281,15 @@ static void MX_DMA_Init(void) {
     LL_DMA_EnableFifoMode(DMA1, LL_DMA_STREAM_0);
     LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_0, LL_DMA_FIFOTHRESHOLD_1_2);
 
+    LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_0, LL_DMA_MDATAALIGN_WORD);
+    LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_0, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for TX */
-    LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
-    LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
+   // LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
+   // LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
 
     /* SAI1_B DMA (RX) */
-    LL_DMA_ConfigAddresses(DMA1, LL_DMA_STREAM_1, 0, 0, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+    LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+    //LL_DMA_ConfigAddresses(DMA1, LL_DMA_STREAM_1, 0, 0, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_1, AUDIO_BUFFER_SIZE);
     LL_DMA_SetPeriphRequest(DMA1, LL_DMA_STREAM_1, LL_DMAMUX1_REQ_SAI1_B);
     LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY |
@@ -310,9 +299,11 @@ static void MX_DMA_Init(void) {
     LL_DMA_EnableFifoMode(DMA1, LL_DMA_STREAM_1);
     LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_1, LL_DMA_FIFOTHRESHOLD_1_2);
 
+    LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_1, LL_DMA_MDATAALIGN_WORD);
+    LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_1, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for RX */
-    LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_1);
-    LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_1);
+   // LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_1);
+   // LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_1);
 
     /* NVIC configuration for DMA interrupts */
     NVIC_SetPriority(DMA1_Stream0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
@@ -325,7 +316,7 @@ static void MX_GPIO_Init(void) {
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOA);
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOD);
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOE);
-
+    LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOF);
 
     /* RST pin. PE15 */
     LL_GPIO_SetPinMode(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin, LL_GPIO_MODE_OUTPUT);
@@ -369,6 +360,9 @@ static void MX_GPIO_Init(void) {
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_3, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_3, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_3, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    GPIOE->PUPDR &= ~(3U << (3 * 2));
+    GPIOE->PUPDR |= (1U << (3 * 2)); // 01: Pull-up
+
 
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_4, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_4, LL_GPIO_AF_6);
@@ -381,22 +375,25 @@ static void MX_GPIO_Init(void) {
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_6, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_6, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_6, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    //disabling contentious pe3 af6 pin. enable as op
+    LL_GPIO_SetPinMode(GPIOF, LL_GPIO_PIN_6, LL_GPIO_MODE_OUTPUT);
+
 }
 
 void SystemClock_Config(void) {
-    LL_FLASH_SetLatency(LL_FLASH_LATENCY_4);
-    while(LL_FLASH_GetLatency() != LL_FLASH_LATENCY_4);
-
-    LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
-    while (LL_PWR_IsActiveFlag_VOS() == 0);
-    // ALSO wait for VOS0 ready in D3CR (H723 RevZ requirement)
-    while ((PWR->D3CR & PWR_D3CR_VOSRDY) == 0);
-
-    /* Enable HSE */
+	/* Enable HSE */
     LL_RCC_HSE_Enable();
     while(LL_RCC_HSE_IsReady() != 1);
 
-    /* PLL1 Configuration for System Clock and 98.304MHz PLL1Q */
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_4);
+    while(LL_FLASH_GetLatency() != LL_FLASH_LATENCY_4);
+    LL_RCC_SetAHBPrescaler(LL_RCC_AHB_DIV_2);
+	LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);
+	LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_2);
+	LL_RCC_SetAPB3Prescaler(LL_RCC_APB3_DIV_2);
+	LL_RCC_SetAPB4Prescaler(LL_RCC_APB4_DIV_2);
+
+    /* PLL3 Configuration for audio Clock and 98.304MHz PLL1Q */
     /* HSE = 25MHz.
        M = 5 -> 5MHz input to PLL.
        N = 98.304 -> VCO = 5 * 98.304 = 491.52 MHz.
@@ -404,8 +401,58 @@ void SystemClock_Config(void) {
        Q = 5 -> PLL1Q = 491.52 / 5 = 98.304 MHz.
        FRACN = 0.304 * 8192 = 2490.
     */
-    LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
+	while ((LL_RCC_HSE_IsReady()!=1));
 
+    LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
+    LL_RCC_PLL3_SetM(5);
+    LL_RCC_PLL3_SetN(120);
+    LL_RCC_PLL3_SetFRACN(3000);
+    LL_RCC_PLL3FRACN_Enable();
+
+    LL_RCC_PLL3_SetP(2);
+    LL_RCC_PLL3_SetQ(1);
+    LL_RCC_PLL3_SetR(2);
+
+
+    LL_RCC_PLL3_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
+    LL_RCC_PLL3_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
+
+    LL_RCC_PLL3P_Enable();
+    LL_RCC_PLL3Q_Enable();
+    while (LL_RCC_PLL3P_IsEnabled()!=1);
+
+    __DSB();
+    LL_RCC_PLL3_Enable();
+    while(LL_RCC_PLL3_IsReady() != 1);
+    // 1. Wait for PLL3RDY (Bit 28 in RCC->CR)
+    while(!(RCC->CR & RCC_CR_PLL3RDY));
+
+    // 2. Perform the Hard Reset to break the HSI lock
+    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
+    for(volatile int i=0; i<5000; i++);
+    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
+
+    // 3. Force the Mux to PLL3_P (Value 0x3 or 0x2 depending on H7 rev)
+   // LL_RCC_SetSAIClockSource(LL_RCC_SAI1_CLKSOURCE_PLL3P);
+    // Force the SAI to "Forget" the HSI (Peripheral Reset)
+    // This is the ONLY way to force the internal clock mux to re-sample
+    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
+    for(volatile int i=0; i<5000; i++); // Wait longer to ensure it clears
+    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
+
+    //saisel to pll3p
+    RCC->D2CCIP1R &= ~(7U << 0);
+    RCC->D2CCIP1R |= (2U << 0);
+
+
+    /* PLL1 Configuration for System Clock and 98.304MHz PLL3Q */
+       /* HSE = 25MHz.
+          M = 5 -> 5MHz input to PLL.
+          N = 98.304 -> VCO = 5 * 98.304 = 491.52 MHz.
+          P = 1 -> CPU = 491.52 MHz (H723 limit is 550MHz).
+          Q = 5 -> PLL1Q = 491.52 / 5 = 98.304 MHz.
+          FRACN = 0.304 * 8192 = 2490.
+       */
     LL_RCC_PLL1_SetM(5);
     LL_RCC_PLL1_SetN(98);
     LL_RCC_PLL1_SetFRACN(2490);
@@ -415,24 +462,20 @@ void SystemClock_Config(void) {
     LL_RCC_PLL1_SetQ(5);
     LL_RCC_PLL1_SetR(2);
 
-    LL_RCC_PLL1_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_2_4);
-    LL_RCC_PLL1_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
 
-    LL_RCC_PLL1_Enable();
-    while(LL_RCC_PLL1_IsReady() != 1);
+    LL_RCC_PLL1_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
+    LL_RCC_PLL1_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
 
     LL_RCC_PLL1P_Enable();
     LL_RCC_PLL1Q_Enable();
+    while (LL_RCC_PLL1Q_IsEnabled()!=1);
 
-    /* Set Sysclk to PLL1P */
+    __DSB();
+    LL_RCC_PLL1_Enable();
+    while(LL_RCC_PLL1_IsReady() != 1);
+
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL1);
     while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL1);
-
-    LL_RCC_SetAHBPrescaler(LL_RCC_AHB_DIV_2);
-    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);
-    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_2);
-    LL_RCC_SetAPB3Prescaler(LL_RCC_APB3_DIV_2);
-    LL_RCC_SetAPB4Prescaler(LL_RCC_APB4_DIV_2);
 
     // kernel clock source first
     RCC->D2CCIP1R &= ~RCC_D2CCIP1R_SPI45SEL; //0b000 =apb2
@@ -447,28 +490,36 @@ void SystemClock_Config(void) {
         // trap here if still not set
         while(1);
     }
+    // // Enable SRAM1, SRAM2 clocks (D2 Domain)
+    // LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_D2SRAM1 |
+    //                          LL_AHB2_GRP1_PERIPH_D2SRAM2);
+
+    RCC->AHB2ENR |= (RCC_AHB2ENR_SRAM1EN | RCC_AHB2ENR_SRAM2EN);
+    // Short delay to ensure clock is stable before access
+    (void)RCC->AHB2ENR;
+
 }
 
 
 
 
 
-
-static void mySimpleWrite(void){
-    // // CS low
-    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
-    // write both bytes
-    while (!(SPI4->SR & SPI_SR_TXP));
-    *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
-    while (!(SPI4->SR & SPI_SR_TXP));
-    *(volatile uint8_t *)&SPI4->TXDR = 0x55;
-    // start
-    SPI4->CR1 |= SPI_CR1_CSTART;
-    __DSB();
-    __NOP();
-    //CS high
-    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
-}
+//
+// static void mySimpleWrite(void){
+//     // // CS low
+//     LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
+//     // write both bytes
+//     while (!(SPI4->SR & SPI_SR_TXP));
+//     *(volatile uint8_t *)&SPI4->TXDR = 0xAA;
+//     while (!(SPI4->SR & SPI_SR_TXP));
+//     *(volatile uint8_t *)&SPI4->TXDR = 0x55;
+//     // start
+//     SPI4->CR1 |= SPI_CR1_CSTART;
+//     __DSB();
+//     __NOP();
+//     //CS high
+//     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
+// }
 
 void Error_Handler(void) {
     while (1);
