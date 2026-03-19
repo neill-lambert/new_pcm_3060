@@ -36,6 +36,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
+void Disable_DCache_Safe(void);
 //static void mySimpleWrite(void);
 
 int main(void) {
@@ -65,21 +66,15 @@ int main(void) {
         tx_buffer[i] = 0x12345678;
     }
     __DSB(); // Ensure writes are finished
-   // SCB_DisableDCache();//
+    //SCB_CleanDCache_by_Addr((uint32_t*)rx_buffer, sizeof(rx_buffer));
 
     // memset((void*)rx_buffer, 0, sizeof(rx_buffer));
     // memset((void*)tx_buffer, 0, sizeof(tx_buffer));
     /* Enable I-Cache and D-Cache */
-   // SCB_EnableICache();
-    //SCB_EnableDCache();
+    //SCB_EnableICache();
+   // SCB_EnableDCache();
     /* Set Priority Grouping */
     NVIC_SetPriorityGrouping(3); // NVIC_PRIORITYGROUP_4: 4 bits for pre-emption priority
-
-    /* System initialization */
-//    LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
-//	while (LL_PWR_IsActiveFlag_VOS() == 0);
-	// ALSO wait for VOS0 ready in D3CR (H723 RevZ requirement)
-	//while ((PWR->D3CR & PWR_D3CR_VOSRDY) == 0);
 
     SystemClock_Config();
 
@@ -151,7 +146,7 @@ static void MX_SAI1_Init(void) {
     RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
 
     //Ensure PLL1 is locked and DIVQ1EN is 1
-    while((!(RCC->CR & RCC_CR_PLL3RDY)));
+    while(((!(RCC->CR & RCC_CR_PLL3RDY))));
 
     //saisel to pll3p
 
@@ -187,7 +182,7 @@ static void MX_SAI1_Init(void) {
                         (0 << SAI_xCR1_SYNCEN_Pos) | // 0: Asynchronous
                         (7 << SAI_xCR1_DS_Pos) | // 5: 24-bit
                         (0 << SAI_xCR1_LSBFIRST_Pos) | // 0: MSB first
-                        (4 << 20) | // MCKDIV = 4 (for 96kHz with 98.304MHz SAI_CLK)
+                        (0 << 20) | // MCKDIV = 4 (for 96kHz with 98.304MHz SAI_CLK)
                         SAI_xCR1_MCKEN; // Master clock enable
 
     // CR2: FIFO Threshold, MCLK Divider
@@ -404,21 +399,21 @@ void SystemClock_Config(void) {
 	while ((LL_RCC_HSE_IsReady()!=1));
 
     LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
-    LL_RCC_PLL3_SetM(5);
-    LL_RCC_PLL3_SetN(120);
-    LL_RCC_PLL3_SetFRACN(3000);
+    LL_RCC_PLL3_SetM(1);
+    LL_RCC_PLL3_SetN(61);
+    LL_RCC_PLL3_SetFRACN(3604);
     LL_RCC_PLL3FRACN_Enable();
 
-    LL_RCC_PLL3_SetP(2);
-    LL_RCC_PLL3_SetQ(1);
-    LL_RCC_PLL3_SetR(2);
+    LL_RCC_PLL3_SetP(20);
+    //LL_RCC_PLL3_SetQ(1);
+    //LL_RCC_PLL3_SetR(2);
 
 
     LL_RCC_PLL3_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
     LL_RCC_PLL3_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
 
     LL_RCC_PLL3P_Enable();
-    LL_RCC_PLL3Q_Enable();
+    //LL_RCC_PLL3Q_Enable();
     while (LL_RCC_PLL3P_IsEnabled()!=1);
 
     __DSB();
@@ -453,14 +448,14 @@ void SystemClock_Config(void) {
           Q = 5 -> PLL1Q = 491.52 / 5 = 98.304 MHz.
           FRACN = 0.304 * 8192 = 2490.
        */
-    LL_RCC_PLL1_SetM(5);
-    LL_RCC_PLL1_SetN(98);
-    LL_RCC_PLL1_SetFRACN(2490);
-    LL_RCC_PLL1FRACN_Enable();
+    LL_RCC_PLL1_SetM(1);
+    LL_RCC_PLL1_SetN(123);
+//    LL_RCC_PLL1_SetFRACN(0);
+//    LL_RCC_PLL1FRACN_Enable();
 
-    LL_RCC_PLL1_SetP(1);
-    LL_RCC_PLL1_SetQ(5);
-    LL_RCC_PLL1_SetR(2);
+   // LL_RCC_PLL1_SetP(40);
+    LL_RCC_PLL1_SetQ(40);
+   // LL_RCC_PLL1_SetR(2);
 
 
     LL_RCC_PLL1_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
@@ -501,7 +496,21 @@ void SystemClock_Config(void) {
 }
 
 
-
+//void Disable_DCache_Safe(void) {
+//    // 1. Clean and Invalidate: Force all cached data into AXI SRAM (0x24000000)
+//    // This ensures your stack and variables are actually in RAM.
+//    SCB_CleanInvalidateDCache();
+//
+//    // 2. Data Synchronization Barrier: Wait for all memory writes to finish
+//    __DSB();
+//
+//    // 3. Disable the D-Cache bit in the System Control Block
+//    SCB->CCR &= ~(uint32_t)SCB_CCR_DC_Msk;
+//
+//    // 4. Instruction Synchronization Barrier: Flush the CPU pipeline
+//    __DSB();
+//    __ISB();
+//}
 
 
 //
