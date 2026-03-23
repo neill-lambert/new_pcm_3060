@@ -129,6 +129,7 @@ int main(void) {
               tx_buffer[i] = rx_buffer[i];
               //SCB_InvalidateDCache_by_Addr((uint32_t *)rx_buffer, sizeof(rx_buffer));
         }
+        uint8_t bit = (GPIOE->IDR & GPIO_IDR_ID3) ? 1 : 0;
     }
 }
 
@@ -322,7 +323,7 @@ static void MX_GPIO_Init(void) {
 
     /* MODE Pin. PE11 */
     //ALSO WE NEED TO PULL THIS HIGH EXTERNALLY. SO 3060 FINDS IT IN CORRECT MODE AT BOOT
-    LL_GPIO_SetPinMode(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_MODE_ANALOG);
+    LL_GPIO_SetPinMode(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_MODE_OUTPUT);
     LL_GPIO_SetPinSpeed(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_SPEED_FREQ_LOW);
     LL_GPIO_SetPinPull(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_PULL_UP);
     LL_GPIO_SetPinOutputType(PCM3060_MODE_GPIO_Port, PCM3060_MODE_Pin, LL_GPIO_OUTPUT_PUSHPULL);
@@ -352,12 +353,24 @@ static void MX_GPIO_Init(void) {
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_2, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_2, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
-    LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_3, LL_GPIO_MODE_ALTERNATE);
+
+    LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_3, LL_GPIO_MODE_INPUT);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_3, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_3, LL_GPIO_SPEED_FREQ_VERY_HIGH);
     GPIOE->PUPDR &= ~(3U << (3 * 2));
     GPIOE->PUPDR |= (1U << (3 * 2)); // 01: Pull-up
-
+    // 1. Enable GPIOE Clock
+//    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
+//
+//    // 2. Set PE3 as INPUT (00)
+//    GPIOE->MODER &= ~(3U << (3 * 2));
+//
+//    // 3. Force a PULL-UP (01)
+//    GPIOE->PUPDR &= ~(3U << (3 * 2));
+//    GPIOE->PUPDR |=  (1U << (3 * 2));
+//
+//    // 4. Ensure no other AF is claiming it (set to 0)
+//    GPIOE->AFR[0] &= ~(0x0F << (3 * 4));
 
     LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_4, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_4, LL_GPIO_AF_6);
