@@ -24,8 +24,10 @@
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4499:22:LL_RCC_PLL1_SetVCOInputRange	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4570:22:LL_RCC_PLL1_SetN	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4581:22:LL_RCC_PLL1_SetM	1
+/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4594:22:LL_RCC_PLL1_SetP	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4605:22:LL_RCC_PLL1_SetQ	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4948:22:LL_RCC_PLL3_Enable	1
+/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4959:22:LL_RCC_PLL3_Disable	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4969:26:LL_RCC_PLL3_IsReady	2
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:4980:22:LL_RCC_PLL3P_Enable	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_rcc.h:5012:22:LL_RCC_PLL3FRACN_Enable	1
@@ -78,9 +80,9 @@
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_bus.h:2480:22:LL_APB2_GRP1_EnableClock	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_bus.h:2530:26:LL_APB2_GRP1_IsEnabledClock	2
 ../Core/Src/main.c:42:5:main	8
-../Core/Src/main.c:136:13:MX_SAI1_Init	4
-../Core/Src/main.c:224:13:MX_SPI4_Init	1
-../Core/Src/main.c:265:13:MX_DMA_Init	1
-../Core/Src/main.c:311:13:MX_GPIO_Init	1
-../Core/Src/main.c:391:6:SystemClock_Config	13
-../Core/Src/main.c:546:6:Error_Handler	1
+../Core/Src/main.c:140:13:MX_SAI1_Init	4
+../Core/Src/main.c:230:13:MX_SPI4_Init	1
+../Core/Src/main.c:271:13:MX_DMA_Init	1
+../Core/Src/main.c:317:13:MX_GPIO_Init	1
+../Core/Src/main.c:397:6:SystemClock_Config	15
+../Core/Src/main.c:558:6:Error_Handler	1

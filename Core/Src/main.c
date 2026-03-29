@@ -89,7 +89,7 @@ int main(void) {
 
     /* Initialize PCM3060 via SPI4 */
     LL_GPIO_ResetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin); // Active Low Reset
-    LL_mDelay(10);
+    LL_mDelay(100);
     LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
     LL_mDelay(10);
  //   mySimpleWrite();
@@ -110,7 +110,6 @@ int main(void) {
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
     LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
 
-    PCM3060_Init(SPI4);
     LL_mDelay(10);
 
 
@@ -119,6 +118,9 @@ int main(void) {
 
     SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
     SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
+
+    PCM3060_Init(SPI4);
+
     PCM3060_WriteReg(SPI4, 0x40, 0xC0);
 
     LL_mDelay(10);
@@ -126,10 +128,12 @@ int main(void) {
     while (1) {
         /* Simple loopback: copy rx to tx */
         for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-              tx_buffer[i] = rx_buffer[i];
-              //SCB_InvalidateDCache_by_Addr((uint32_t *)rx_buffer, sizeof(rx_buffer));
+              //tx_buffer[i] = rx_buffer[i];
+              int32_t raw_adc = (int32_t)rx_buffer[i];
+              int32_t shifted_adc = raw_adc >> 8; // Shift out the 8-bit "padding" of a 24-bit sample
+              int16_t monitor_val = (int16_t)(raw_adc >> 16);
+              int32_t correctly_signed = (raw_adc << 8) >> 8;
         }
-        uint8_t bit = (GPIOE->IDR & GPIO_IDR_ID3) ? 1 : 0;
     }
 }
 
@@ -153,6 +157,8 @@ static void MX_SAI1_Init(void) {
 
      RCC->D2CCIP1R &= ~(7U << 0);
      RCC->D2CCIP1R |= (2U << 0);
+
+     //
 
     // 3. Re-verify the Mux (PLL3_P is 0x2, 0b010)
    // RCC->D2CCIP1R |= 0x2; // 010: PLL3_P
@@ -183,7 +189,7 @@ static void MX_SAI1_Init(void) {
                         (0 << SAI_xCR1_SYNCEN_Pos) | // 0: Asynchronous
                         (7 << SAI_xCR1_DS_Pos) | // 5: 24-bit
                         (0 << SAI_xCR1_LSBFIRST_Pos) | // 0: MSB first
-                        (0 << 20) | // MCKDIV = 4 (for 96kHz with 98.304MHz SAI_CLK)
+                        (2 << SAI_xCR1_MCKDIV_Pos) |
                         SAI_xCR1_MCKEN; // Master clock enable
 
     // CR2: FIFO Threshold, MCLK Divider
@@ -354,11 +360,11 @@ static void MX_GPIO_Init(void) {
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_2, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
 
-    LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_3, LL_GPIO_MODE_INPUT);
+    LL_GPIO_SetPinMode(GPIOE, LL_GPIO_PIN_3, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_3, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_3, LL_GPIO_SPEED_FREQ_VERY_HIGH);
     GPIOE->PUPDR &= ~(3U << (3 * 2));
-    GPIOE->PUPDR |= (1U << (3 * 2)); // 01: Pull-up
+    GPIOE->PUPDR |= (0U << (3 * 2)); // 00: No Pull-up
     // 1. Enable GPIOE Clock
 //    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
 //
@@ -412,12 +418,22 @@ void SystemClock_Config(void) {
 	while ((LL_RCC_HSE_IsReady()!=1));
 
     LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
+
+
+    LL_RCC_PLL3_Disable();
+    while(LL_RCC_PLL3_IsReady()); // wait for it to stop
     LL_RCC_PLL3_SetM(1);
     LL_RCC_PLL3_SetN(61);
+    LL_RCC_PLL3_SetP(10); // 49.152MHz / 2 = 24.576MHz MCLK
+
     LL_RCC_PLL3_SetFRACN(3604);
     LL_RCC_PLL3FRACN_Enable();
+    LL_RCC_PLL3_Enable();
+    while(!LL_RCC_PLL3_IsReady());
 
-    LL_RCC_PLL3_SetP(20);
+//    LL_RCC_PLL3_SetFRACN(3604);
+//    LL_RCC_PLL3FRACN_Enable();
+
     //LL_RCC_PLL3_SetQ(1);
     //LL_RCC_PLL3_SetR(2);
 
@@ -463,13 +479,9 @@ void SystemClock_Config(void) {
        */
     LL_RCC_PLL1_SetM(1);
     LL_RCC_PLL1_SetN(123);
-//    LL_RCC_PLL1_SetFRACN(0);
-//    LL_RCC_PLL1FRACN_Enable();
 
-   // LL_RCC_PLL1_SetP(40);
+    LL_RCC_PLL1_SetP(2);
     LL_RCC_PLL1_SetQ(40);
-   // LL_RCC_PLL1_SetR(2);
-
 
     LL_RCC_PLL1_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
     LL_RCC_PLL1_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);

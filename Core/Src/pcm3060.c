@@ -55,7 +55,39 @@ void PCM3060_WriteReg(SPI_TypeDef *SPIx, uint8_t reg, uint8_t data) {
     //CS high
     LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
 }
-
+//
+//void PCM3060_WriteReg(SPI_TypeDef *SPIx, uint8_t reg, uint8_t data) {
+//    pcm3060_shadow[PCM3060_REG_IDX(reg)] = data;
+//
+//    // Ensure SPI is disabled to configure
+//    LL_SPI_Disable(SPIx);
+//    SPIx->IFCR = 0xFFFFFFFF;
+//
+//    // Set transfer size BEFORE enable
+//    LL_SPI_SetTransferSize(SPIx, 2);
+//
+//    // Enable
+//    LL_SPI_Enable(SPIx);
+//
+//    // CS low
+//    LL_GPIO_ResetOutputPin(GPIOD, LL_GPIO_PIN_14);
+//
+//    // Load both bytes
+//    while (!(SPIx->SR & SPI_SR_TXP));
+//    *(volatile uint8_t *)&SPIx->TXDR = reg & 0x7F;
+//    while (!(SPIx->SR & SPI_SR_TXP));
+//    *(volatile uint8_t *)&SPIx->TXDR = data;
+//
+//    // Start transfer
+//    SPIx->CR1 |= SPI_CR1_CSTART;
+//
+//    // Wait for completion
+//    while (!LL_SPI_IsActiveFlag_EOT(SPIx));
+//    LL_SPI_ClearFlag_EOT(SPIx);
+//
+//    // CS high
+//    LL_GPIO_SetOutputPin(GPIOD, LL_GPIO_PIN_14);
+//}
 
 void PCM3060_ClearBit(SPI_TypeDef *SPIx, uint8_t reg, uint8_t bit) {
     uint8_t val = pcm3060_shadow[PCM3060_REG_IDX(reg)];
@@ -89,7 +121,7 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
     PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0);
     __DSB();
 
-    PCM3060_WriteReg(SPIx, PCM3060_REG_CLOCK_SEL, 0x01);
+    PCM3060_WriteReg(SPIx, PCM3060_REG_CLOCK_SEL, 0x00);
     __DSB();
     //configure dac ctrl1. attenuation l. all ffs. no at.
     PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_ATTEN_L, 0xFF);

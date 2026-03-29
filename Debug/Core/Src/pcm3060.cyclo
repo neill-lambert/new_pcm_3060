@@ -7,6 +7,6 @@
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_gpio.h:884:22:LL_GPIO_SetOutputPin	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_gpio.h:913:22:LL_GPIO_ResetOutputPin	1
 ../Core/Src/pcm3060.c:27:6:PCM3060_WriteReg	4
-../Core/Src/pcm3060.c:60:6:PCM3060_ClearBit	1
-../Core/Src/pcm3060.c:66:6:PCM3060_SetBit	1
-../Core/Src/pcm3060.c:72:6:PCM3060_Init	1
+../Core/Src/pcm3060.c:92:6:PCM3060_ClearBit	1
+../Core/Src/pcm3060.c:98:6:PCM3060_SetBit	1
+../Core/Src/pcm3060.c:104:6:PCM3060_Init	1
