@@ -14,6 +14,12 @@ extern "C" {
 #include "stm32h7xx_ll_utils.h"
 #include "stm32h7xx_ll_system.h"
 
+typedef enum {
+	left,
+	right
+}alignment;
+
+volatile extern alignment myAlign;
 
 void Error_Handler(void);
 

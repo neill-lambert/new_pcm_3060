@@ -30,6 +30,7 @@
 __attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
 __attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
+volatile alignment myAlign;
 /* Private function prototypes */
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -37,7 +38,6 @@ static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
 void Disable_DCache_Safe(void);
-//static void mySimpleWrite(void);
 
 int main(void) {
 
@@ -102,40 +102,69 @@ int main(void) {
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_1, (uint32_t)rx_buffer);
     LL_DMA_SetPeriphAddress(DMA1, LL_DMA_STREAM_1, (uint32_t)&SAI1_Block_B->DR);
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_1, AUDIO_BUFFER_SIZE);
-    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1);
+    //LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1);
 
     /* SAI1 Block A (TX) DMA Start */
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)tx_buffer);
     LL_DMA_SetPeriphAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)&SAI1_Block_A->DR);
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
-    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
+    //LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
 
     LL_mDelay(10);
 
 
-    SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
-    SAI1_Block_B->CR1 |= SAI_xCR1_SAIEN;
+    // 1. Ensure everything is off
+    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
+    SAI1_Block_B->CR1 &= ~SAI_xCR1_SAIEN;
+    SAI1_Block_A->CR1 &= ~SAI_xCR1_DMAEN;
+    SAI1_Block_B->CR1 &= ~SAI_xCR1_DMAEN;
 
+    // 2. Flush the FIFOs to clear "Ghost Data"
+    SAI1_Block_A->CR2 |= SAI_xCR2_FFLUSH;
+    SAI1_Block_B->CR2 |= SAI_xCR2_FFLUSH;
+
+    // 3. Set the DMA request bits FIRST (The "Door" is open)
+    SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
     SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
+
+    // 4. Enable the DMA Streams (The "Servant" is waiting)
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0); // RX
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1); // TX
+
+    // 5. START THE CLOCK LAST (The "Master" starts the race)
+    // Crucial: Start the Slave block (B) before the Master block (A)
+    // so the listener is ready before the talker starts the clock.
+    SAI1_Block_B->CR1 |= SAI_xCR1_SAIEN;
     SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
+
 
     PCM3060_Init(SPI4);
 
-    PCM3060_WriteReg(SPI4, 0x40, 0xC0);
+    //PCM3060_WriteReg(SPI4, 0x40, 0xC0);
 
     LL_mDelay(10);
 
     while (1) {
-        /* Simple loopback: copy rx to tx */
-        for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-              //tx_buffer[i] = rx_buffer[i];
-              int32_t raw_adc = (int32_t)rx_buffer[i];
-              int32_t shifted_adc = raw_adc >> 8; // Shift out the 8-bit "padding" of a 24-bit sample
-              int16_t monitor_val = (int16_t)(raw_adc >> 16);
-              int32_t correctly_signed = (raw_adc << 8) >> 8;
+
+    		alignment mainAlign = myAlign;
+        	static int32_t sawtooth_accumulator = 0;
+        	const int32_t increment = 50000; // This controls the pitch (Frequency)
+
+        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+        	    // 1. Generate the Raw Wave
+        	    sawtooth_accumulator += increment;
+
+        	    // 2. Keep it in the 24-bit range (-8.3M to +8.3M)
+        	    // We use the same 'Sign Extension' trick to keep it clean
+        	    int32_t signal = (sawtooth_accumulator << 8) >> 8;
+
+        	    // 3. The "Solid Left" TX Align
+        	    // Since your RX is 'Solid Left', your TX should be too.
+        	    // We move the signal back into the 'Left-Aligned' 32-bit slot
+        	    tx_buffer[i] = (uint32_t)(signal << 8) >> 1;
+        	}
         }
-    }
-}
+} //end main?
 
 static void MX_SAI1_Init(void) {
     // 1. Enable the Bus Clock (so you can talk to the registers)
@@ -158,26 +187,7 @@ static void MX_SAI1_Init(void) {
      RCC->D2CCIP1R &= ~(7U << 0);
      RCC->D2CCIP1R |= (2U << 0);
 
-     //
 
-    // 3. Re-verify the Mux (PLL3_P is 0x2, 0b010)
-   // RCC->D2CCIP1R |= 0x2; // 010: PLL3_P
-    // 4. Force the mux to a different, active clock first (e.g., PLL2_P or HSI)
-   // MODIFY_REG(RCC->D2CCIP1R, RCC_D2CCIP1R_SAI1SEL, (1U << RCC_D2CCIP1R_SAI1SEL_Pos));
-    //for(volatile int i=0; i<1000; i++);
-
-    // 5. Now force it back to PLL1_Q (0x0)
-   // MODIFY_REG(RCC->D2CCIP1R, RCC_D2CCIP1R_SAI1SEL, 0);
-    // 6. Perform the Peripheral Reset
-    // This "un-sticks" the internal state machine
-//    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
-//    for(volatile int i=0; i<100; i++); // Short delay
-//    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
-
-    // 3. Force the Clock Mux (again, just to be safe)
-    //RCC->D2CCIP1R |= 0x2; // 010: PLL3_P
-    // 3. Set the Kernel Clock Source (PLL1P)
-    // Doing this after the reset ensures the Mux "takes" correctly
     LL_RCC_SetSAIClockSource(LL_RCC_SAI1_CLKSOURCE_PLL3P);
 
     while ((LL_APB2_GRP1_IsEnabledClock(LL_APB2_GRP1_PERIPH_SAI1))!=1);
@@ -209,7 +219,9 @@ static void MX_SAI1_Init(void) {
     //                       ((2 - 1) << SAI_xSLOTR_NBSLOT_Pos) |
     //                       SAI_xSLOTR_SLOTEN; // Enable all slots (or at least first 2)
     // Enable exactly Slot 0 and Slot 1
-    SAI1_Block_A->SLOTR = (0 << SAI_xSLOTR_FBOFF_Pos) |
+    SAI1_Block_A->SLOTR &= ~SAI_xSLOTR_FBOFF; // Clear it
+    SAI1_Block_A->SLOTR |= (1 << SAI_xSLOTR_FBOFF_Pos); // Nudge by 1 bit was tring this nudging. doesnt seem to change the i2s l/r justified problem
+    SAI1_Block_A->SLOTR = //(0 << SAI_xSLOTR_FBOFF_Pos) |
                           (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 32-bit
                           (1 << SAI_xSLOTR_NBSLOT_Pos) | // 2 slots (N-1)
                           (0x3U << 16);                 // SLOTEN[1:0] bits
@@ -220,7 +232,10 @@ static void MX_SAI1_Init(void) {
     // CR1: Synchronous Slave RX, 24-bit
     SAI1_Block_B->CR1 = (3 << SAI_xCR1_MODE_Pos) | // 3: Slave RX
                         (1 << SAI_xCR1_SYNCEN_Pos) | // 1: Synchronous with other block
-                        (7 << SAI_xCR1_DS_Pos); // 5: 24-bit
+                        (7 << SAI_xCR1_DS_Pos) | // 5: 24-bit
+						(0 << SAI_xCR1_LSBFIRST_Pos) | // 0: MSB first
+						(2 << SAI_xCR1_MCKDIV_Pos) |
+						SAI_xCR1_MCKEN; // Master clock enable
 
     SAI1_Block_B->FRCR = SAI1_Block_A->FRCR;
 

@@ -32,6 +32,7 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -178,6 +179,9 @@ void DMA1_Stream1_IRQHandler(void)
     LL_DMA_ClearFlag_HT1(DMA1);
     /* Invalidate the first half of the RX buffer to ensure CPU sees DMA updates */
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    uint32_t sample = rx_buffer[0];
+	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
+	else myAlign = right;
   }
   if (LL_DMA_IsActiveFlag_TC1(DMA1))
   {
@@ -185,8 +189,12 @@ void DMA1_Stream1_IRQHandler(void)
     /* Invalidate the second half of the RX buffer to ensure CPU sees DMA updates */
 
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    uint32_t sample = rx_buffer[0];
+	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
+	else myAlign = right;
   }
 }
+
 
 /**
   * @}
