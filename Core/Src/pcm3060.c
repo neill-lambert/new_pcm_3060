@@ -118,6 +118,7 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
 //    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xFF);
 //    __DSB();
 
+
     PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0);
     __DSB();
 
@@ -134,6 +135,9 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
 
     // Configure ADC Control 2: attenuation r. 1101 0111b 215 = 0db.
     PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_R, 0xD7);
+
+    // unmute softmutes.
+    PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_OS_S_MUTE, 0x00);
 
     //config wait until txe empty here.
 }

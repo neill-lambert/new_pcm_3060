@@ -38,6 +38,7 @@ static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
 void Disable_DCache_Safe(void);
+void SAI_SafeStart(void);
 
 int main(void) {
 
@@ -63,7 +64,7 @@ int main(void) {
     // Use a simple loop to force the ECC to initialize
     for(int i=0; i < AUDIO_BUFFER_SIZE; i++) {
         rx_buffer[i] = 0;
-        tx_buffer[i] = 0x12345678;
+        tx_buffer[i] = 0;
     }
     __DSB(); // Ensure writes are finished
     //SCB_CleanDCache_by_Addr((uint32_t*)rx_buffer, sizeof(rx_buffer));
@@ -92,10 +93,7 @@ int main(void) {
     LL_mDelay(100);
     LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
     LL_mDelay(10);
- //   mySimpleWrite();
-    for(int i=0; i<AUDIO_BUFFER_SIZE; i++) {
-        tx_buffer[i] = 0x12345678;
-    }
+
     /* Start Audio Streaming via SAI DMA (TDM mode) */
 
     /* SAI1 Block B (RX) DMA Start */
@@ -123,6 +121,9 @@ int main(void) {
     SAI1_Block_A->CR2 |= SAI_xCR2_FFLUSH;
     SAI1_Block_B->CR2 |= SAI_xCR2_FFLUSH;
 
+   // SAI_SafeStart();
+
+
     // 3. Set the DMA request bits FIRST (The "Door" is open)
     SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
     SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
@@ -145,25 +146,57 @@ int main(void) {
     LL_mDelay(10);
 
     while (1) {
+    	// Wait for FIFO to have space
+//    	    while (!(SAI1_Block_A->SR & SAI_xSR_FREQ));
+//    	    SAI1_Block_A->DR = 0x7FFFFF00; // Send Left (Big Positive)
+//
+//    	    while (!(SAI1_Block_A->SR & SAI_xSR_FREQ));
+//    	    SAI1_Block_A->DR = 0x7FFFFF00; // Send Right (Big Positive)
 
     		alignment mainAlign = myAlign;
         	static int32_t sawtooth_accumulator = 0;
-        	const int32_t increment = 50000; // This controls the pitch (Frequency)
+        	const int32_t increment = 100; // This controls the pitch (Frequency)
 
+//        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+//        	    // A simple XORShift or just a messy increment
+//        	    static uint32_t seed = 0x12345678;
+//        	    seed ^= seed << 13;
+//        	    seed ^= seed >> 17;
+//        	    seed ^= seed << 5;
+//        	    tx_buffer[i] = seed & 0x0FFFFF00; // Random 24-bit noise
+//        	}
+//        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+//        	    if (i < AUDIO_BUFFER_SIZE / 2) {
+//        	        tx_buffer[i] = 0x40000000; // Half-scale positive
+//        	    } else {
+//        	        tx_buffer[i] = 0xC0000000; // Half-scale negative
+//        	    }
+//        	}
+//
         	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-        	    // 1. Generate the Raw Wave
+////        	    // 1. Generate the Raw Wave
         	    sawtooth_accumulator += increment;
-
-        	    // 2. Keep it in the 24-bit range (-8.3M to +8.3M)
-        	    // We use the same 'Sign Extension' trick to keep it clean
-        	    int32_t signal = (sawtooth_accumulator << 8) >> 8;
-
-        	    // 3. The "Solid Left" TX Align
-        	    // Since your RX is 'Solid Left', your TX should be too.
-        	    // We move the signal back into the 'Left-Aligned' 32-bit slot
-        	    tx_buffer[i] = (uint32_t)(signal << 8) >> 1;
-        	}
-        }
+////        	    tx_buffer[i] = 0x7FFFFF00;
+//////        	    if (i % 2 != 0)
+//////        	    {
+////					// 2. Keep it in the 24-bit range (-8.3M to +8.3M)
+////					// We use the same 'Sign Extension' trick to keep it clean
+					int32_t signal = (sawtooth_accumulator << 8) >> 8;
+////
+////					// 3. The "Solid Left" TX Align
+////					// Since your RX is 'Solid Left', your TX should be too.
+////					// We move the signal back into the 'Left-Aligned' 32-bit slot
+					tx_buffer[i] = (uint32_t)(signal << 8) >> 1;
+        	    }
+//        	}
+        	//sawtooth_accumulator = 0;
+//           	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+//                	    // Fill with a VERY large constant instead of a wave
+//                	    // This makes it easier to see in the debugger
+//                	    if (i % 2 == 0) tx_buffer[i] = 0x0FFFFF00; // Should be Left
+//                	    else           tx_buffer[i] = 0x00000000; // Should be Right
+//                	}
+    } //end while
 } //end main?
 
 static void MX_SAI1_Init(void) {
@@ -209,10 +242,11 @@ static void MX_SAI1_Init(void) {
     // FRCR: Frame length = 64 (2 slots * 32 bits), Active frame length = 32 (FS high for 32 bits)
     SAI1_Block_A->FRCR = ((64 - 1) << SAI_xFRCR_FRL_Pos) |
                          ((32 - 1) << SAI_xFRCR_FSALL_Pos) |
-                         SAI_xFRCR_FSDEF | // FS is channel identification
+                         (1 << SAI_xFRCR_FSDEF_Pos) | // FS is channel identification
                          (0 << SAI_xFRCR_FSPOL_Pos) | // 0: FS active low (I2S standard)
-                            (SAI_xFRCR_FSOFF); // FS 1 bit before data
+                         (1 << SAI_xFRCR_FSOFF_Pos); // FS 1 bit before data
 
+    //SAI1_Block_A->FRCR &= ~(SAI_xFRCR_FSOFF); // added this to try turning fsoff off.
     // // SLOTR: 2 slots, each 32-bit, slots 0 and 1 active
     // SAI1_Block_A->SLOTR = (0 << SAI_xSLOTR_FBOFF_Pos) |
     //                       (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 2: 32-bit
@@ -221,10 +255,11 @@ static void MX_SAI1_Init(void) {
     // Enable exactly Slot 0 and Slot 1
     SAI1_Block_A->SLOTR &= ~SAI_xSLOTR_FBOFF; // Clear it
     SAI1_Block_A->SLOTR |= (1 << SAI_xSLOTR_FBOFF_Pos); // Nudge by 1 bit was tring this nudging. doesnt seem to change the i2s l/r justified problem
-    SAI1_Block_A->SLOTR = //(0 << SAI_xSLOTR_FBOFF_Pos) |
+    SAI1_Block_A->SLOTR = //(1 << SAI_xSLOTR_FBOFF_Pos) |
                           (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 32-bit
                           (1 << SAI_xSLOTR_NBSLOT_Pos) | // 2 slots (N-1)
-                          (0x3U << 16);                 // SLOTEN[1:0] bits
+						  (0x3 << 16); // Enable first 4 slots just to see if Left "wakes up"
+
 
     /* SAI1_Block_B: Receive (Slave) */
     SAI1_Block_B->CR1 = 0; // Disable
@@ -446,13 +481,6 @@ void SystemClock_Config(void) {
     LL_RCC_PLL3_Enable();
     while(!LL_RCC_PLL3_IsReady());
 
-//    LL_RCC_PLL3_SetFRACN(3604);
-//    LL_RCC_PLL3FRACN_Enable();
-
-    //LL_RCC_PLL3_SetQ(1);
-    //LL_RCC_PLL3_SetR(2);
-
-
     LL_RCC_PLL3_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
     LL_RCC_PLL3_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
 
@@ -533,6 +561,34 @@ void SystemClock_Config(void) {
     // Short delay to ensure clock is stable before access
     (void)RCC->AHB2ENR;
 
+}
+
+void SAI_SafeStart(void) {
+    // 1. Ensure SAI is OFF to allow configuration changes
+    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
+
+    // Force "Free Protocol" (0x0) - Bit 2 in CR1
+    SAI1_Block_A->CR1 &= ~SAI_xCR1_PRTCFG;
+    // 2. Clear DMA request and Flush FIFO
+    SAI1_Block_A->CR2 &= ~SAI_xCR1_DMAEN;
+    SAI1_Block_A->CR2 |= SAI_xCR2_FFLUSH;
+
+    // 3. Clear all error flags (Underrun/Overrun)
+    SAI1_Block_A->CLRFR = 0xFFFFFFFF;
+
+    // 4. PRE-FILL the FIFO (Crucial for avoiding immediate OVRUDR)
+    // We write 4 words (2 Left/Right pairs) so the SAI has a "buffer"
+    // the instant it wakes up.
+    SAI1_Block_A->DR = 0x7FFFFF00; // Slot 0 (Left) - Positive Max
+    SAI1_Block_A->DR = 0x80000100; // Slot 1 (Right) - Negative Max
+    SAI1_Block_A->DR = 0x7FFFFF00; // Slot 0 (Left)
+    SAI1_Block_A->DR = 0x80000100; // Slot 1 (Right)
+
+    // 5. Enable the SAI
+    SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
+
+    // 6. Optional: Now enable DMA if you are using it
+    // SAI1_Block_A->CR2 |= SAI_xCR2_DMAEN;
 }
 
 
