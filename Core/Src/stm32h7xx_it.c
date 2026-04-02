@@ -33,6 +33,13 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 
+/* Audio Buffers */
+#define AUDIO_BUFFER_SIZE 512
+extern int32_t tx_buffer[AUDIO_BUFFER_SIZE];
+extern int32_t rx_buffer[AUDIO_BUFFER_SIZE];
+
+volatile uint8_t audio_buffer_ready = 0;
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -145,10 +152,6 @@ void SysTick_Handler(void)
 /*  file (startup_stm32h7xx.s).                                               */
 /******************************************************************************/
 
-/* Audio Buffers */
-#define AUDIO_BUFFER_SIZE 512
-extern int32_t tx_buffer[AUDIO_BUFFER_SIZE];
-extern int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
 /**
   * @brief  This function handles DMA1 Stream 0 interrupt (TX).
@@ -160,12 +163,14 @@ void DMA1_Stream0_IRQHandler(void)
     LL_DMA_ClearFlag_HT0(DMA1);
     /* Clean the first half of the TX buffer to ensure DMA sees CPU updates */
     SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    audio_buffer_ready = 1;
   }
   if (LL_DMA_IsActiveFlag_TC0(DMA1))
   {
     LL_DMA_ClearFlag_TC0(DMA1);
     /* Clean the second half of the TX buffer to ensure DMA sees CPU updates */
     SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    audio_buffer_ready = 2;
   }
 }
 

@@ -30,15 +30,16 @@
 __attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
 __attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
-volatile alignment myAlign;
+extern volatile uint8_t audio_buffer_ready;
+//extern __IO uint32_t uwTick;  // add this temporarily to watch it
 /* Private function prototypes */
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
-void Disable_DCache_Safe(void);
-void SAI_SafeStart(void);
+//void Disable_DCache_Safe(void);
+//void SAI_SafeStart(void);
 
 int main(void) {
 
@@ -78,9 +79,6 @@ int main(void) {
     NVIC_SetPriorityGrouping(3); // NVIC_PRIORITYGROUP_4: 4 bits for pre-emption priority
 
     SystemClock_Config();
-
-    /* Configure SysTick to 1ms for LL_mDelay */
-    LL_Init1msTick(491520000);
 
     //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
@@ -143,76 +141,27 @@ int main(void) {
 
 
     PCM3060_Init(SPI4);
-
-    //PCM3060_WriteReg(SPI4, 0x40, 0xC0);
-
     LL_mDelay(10);
 
-    while (1) {
-    	// Wait for FIFO to have space
-//    	    while (!(SAI1_Block_A->SR & SAI_xSR_FREQ));
-//    	    SAI1_Block_A->DR = 0x7FFFFF00; // Send Left (Big Positive)
-//
-//    	    while (!(SAI1_Block_A->SR & SAI_xSR_FREQ));
-//    	    SAI1_Block_A->DR = 0x7FFFFF00; // Send Right (Big Positive)
+    static int32_t sawtooth_accumulator = 0;
+    const int32_t increment = 100; // This controls the pitch (Frequency)
 
-        	static int32_t sawtooth_accumulator = 0;
-        	const int32_t increment = 100; // This controls the pitch (Frequency)
+    while (1)
+    {
 
-        	// N=98, P=10, Q=2, R=2
-//        	RCC->PLL3DIVR = (1 << 24) |   // DIVR3 = 1 (actual 2)
-//        	                (1 << 16) |   // DIVQ3 = 1 (actual 2)
-//        	                (9 << 9)  |   // DIVP3 = 9 (actual 10)
-//        	                (98 << 0);    // DIVN3 = 98
-//
-//        	uint32_t divr = RCC->PLL3DIVR;
+    	while (audio_buffer_ready == 0){};
 
-        	//0x1011462
-//        	uint16_t var = (divr & 0x1FF);
-//        	var = ((divr >> 9) & 0x7F);
-//        	var = ((divr >> 16) & 0x7F);
-//        	var = ((divr >> 24) & 0x7F);
-
-        	__asm("nop");
-//        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-//        	    // A simple XORShift or just a messy increment
-//        	    static uint32_t seed = 0x12345678;
-//        	    seed ^= seed << 13;
-//        	    seed ^= seed >> 17;
-//        	    seed ^= seed << 5;
-//        	    tx_buffer[i] = seed & 0x0FFFFF00; // Random 24-bit noise
-//        	}
-//        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-//        	    if (i < AUDIO_BUFFER_SIZE / 2) {
-//        	        tx_buffer[i] = 0x40000000; // Half-scale positive
-//        	    } else {
-//        	        tx_buffer[i] = 0xC0000000; // Half-scale negative
-//        	    }
-//        	}
-//
-       	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++)
+		int offset = (audio_buffer_ready == 1) ? 0 : AUDIO_BUFFER_SIZE / 2;
+		audio_buffer_ready = 0;
+       	for (int i = offset; i < offset + AUDIO_BUFFER_SIZE; i+=2)
         	{
-//////        	    // 1. Generate the Raw Wave
-        			sawtooth_accumulator += increment;
-//////        	    tx_buffer[i] = 0x7FFFFF00;
-////////        	    if (i % 2 != 0)
-////////        	    {
-//////					// 2. Keep it in the 24-bit range (-8.3M to +8.3M)
-//////					// We use the same 'Sign Extension' trick to keep it clean
-					int32_t signal = (sawtooth_accumulator << 8) >> 8;
-//////
-//////					// 3. The "Solid Left" TX Align
-//////					// Since your RX is 'Solid Left', your TX should be too.
-//////					// We move the signal back into the 'Left-Aligned' 32-bit slot
-					tx_buffer[i] = (uint32_t)(signal << 8);
-//        	}
-//        	}
-//           	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-//                	    // Fill with a VERY large constant instead of a wave
-//                	    // This makes it easier to see in the debugger
-//                	    if (i % 2 == 0) tx_buffer[i] = 0x0FFFFF00; // Should be Left
-//                	    else           tx_buffer[i] = 0x00000000; // Should be Right
-                	}
+				sawtooth_accumulator += increment;
+				int32_t signal = (sawtooth_accumulator << 8) >> 8;
+				uint32_t sample = (uint32_t)(signal << 8);
+
+				tx_buffer[i] = sample;
+				tx_buffer[i+1] = sample;
+			}
     } //end while
 } //end main?
 
@@ -335,8 +284,8 @@ static void MX_DMA_Init(void) {
     LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_0, LL_DMA_MDATAALIGN_WORD);
     LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_0, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for TX */
-   // LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
-   // LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
+    LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
 
     /* SAI1_B DMA (RX) */
     LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
@@ -353,8 +302,8 @@ static void MX_DMA_Init(void) {
     LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_1, LL_DMA_MDATAALIGN_WORD);
     LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_1, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for RX */
-   // LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_1);
-   // LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_1);
+    LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_1);
+    LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_1);
 
     /* NVIC configuration for DMA interrupts */
     NVIC_SetPriority(DMA1_Stream0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
@@ -478,7 +427,7 @@ void SystemClock_Config(void) {
     LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
 
     LL_RCC_PLL3_Disable();
-    while(LL_RCC_PLL3_IsReady()); // wait for it to stop
+    while(LL_RCC_PLL3_IsReady()){}; // wait for it to stop
 //    LL_RCC_PLL3_SetM(5);
 //    LL_RCC_PLL3_SetN(99); // old val 61
 //    LL_RCC_PLL3_SetP(11); // old val 10, but pass p value desired+1,
@@ -500,7 +449,7 @@ void SystemClock_Config(void) {
 					(7   <<  9) |  // DIVP3=7 (actual 8)
 					(47  <<  0);   // DIVN3=49
 	LL_RCC_PLL3FRACN_Disable();
-	while (LL_RCC_PLL3FRACN_IsEnabled());
+	while (LL_RCC_PLL3FRACN_IsEnabled()){};
 
 	RCC->PLL3FRACR = (3050 << 3);  // FRACN is bits 15:3
 	LL_RCC_PLL3FRACN_Enable();
@@ -525,18 +474,17 @@ void SystemClock_Config(void) {
     RCC->D2CCIP1R |= (2U << 0);
 
 
-    /* PLL1 Configuration for System Clock and 98.304MHz PLL3Q */
-       /* HSE = 25MHz.
-          M = 5 -> 5MHz input to PLL.
-          N = 98.304 -> VCO = 5 * 98.304 = 491.52 MHz.
-          P = 1 -> CPU = 491.52 MHz (H723 limit is 550MHz).
-          Q = 5 -> PLL1Q = 491.52 / 5 = 98.304 MHz.
-          FRACN = 0.304 * 8192 = 2490.
+    /* PLL1 Configuration for System Clock */
+       /* HSE = 8.33mhz.
+          M = 1 -> 8.33MHz input to PLL.
+          N = 123 -> VCO = 8.33 * 123 = 512.295 MHz.
+          P = 2 -> CPU = 1024.59 MHz (H723 limit is 550MHz).
+          Q = 40 -> PLL1Q = 1024.59 / 40 = 25.614 MHz.
        */
     LL_RCC_PLL1_Disable();
 
     LL_RCC_PLL1_SetM(1);
-    LL_RCC_PLL1_SetN(123);
+    LL_RCC_PLL1_SetN(112);
 
     LL_RCC_PLL1_SetP(2);
     LL_RCC_PLL1_SetQ(40);
@@ -551,6 +499,20 @@ void SystemClock_Config(void) {
     __DSB();
     LL_RCC_PLL1_Enable();
     while(LL_RCC_PLL1_IsReady() != 1);
+
+    /* Configure SysTick to 1ms for LL_mDelay */
+    LL_Init1msTick(235000000);
+    LL_SetSystemCoreClock(470000000);
+
+    // Force SysTick fully enabled with interrupt
+    SysTick->LOAD = 234999;          // 235MHz / 1000 - 1
+    SysTick->VAL  = 0;               // clear current value
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |   // processor clock
+                    SysTick_CTRL_TICKINT_Msk   |   // enable interrupt
+                    SysTick_CTRL_ENABLE_Msk;       // start counter
+    // Check SysTick is actually configured
+    uint32_t reload = SysTick->LOAD;   // should be ~235000 for 1ms tick
+    uint32_t ctrl   = SysTick->CTRL;   // should have bits 0,1,2 set
 
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL1);
     while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL1);
@@ -569,42 +531,39 @@ void SystemClock_Config(void) {
         while(1);
     }
     // // Enable SRAM1, SRAM2 clocks (D2 Domain)
-    // LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_D2SRAM1 |
-    //                          LL_AHB2_GRP1_PERIPH_D2SRAM2);
-
     RCC->AHB2ENR |= (RCC_AHB2ENR_SRAM1EN | RCC_AHB2ENR_SRAM2EN);
     // Short delay to ensure clock is stable before access
     (void)RCC->AHB2ENR;
 
 }
 
-void SAI_SafeStart(void) {
-    // 1. Ensure SAI is OFF to allow configuration changes
-    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
-
-    // Force "Free Protocol" (0x0) - Bit 2 in CR1
-    SAI1_Block_A->CR1 &= ~SAI_xCR1_PRTCFG;
-    // 2. Clear DMA request and Flush FIFO
-    SAI1_Block_A->CR2 &= ~SAI_xCR1_DMAEN;
-    SAI1_Block_A->CR2 |= SAI_xCR2_FFLUSH;
-
-    // 3. Clear all error flags (Underrun/Overrun)
-    SAI1_Block_A->CLRFR = 0xFFFFFFFF;
-
-    // 4. PRE-FILL the FIFO (Crucial for avoiding immediate OVRUDR)
-    // We write 4 words (2 Left/Right pairs) so the SAI has a "buffer"
-    // the instant it wakes up.
-    SAI1_Block_A->DR = 0x7FFFFF00; // Slot 0 (Left) - Positive Max
-    SAI1_Block_A->DR = 0x80000100; // Slot 1 (Right) - Negative Max
-    SAI1_Block_A->DR = 0x7FFFFF00; // Slot 0 (Left)
-    SAI1_Block_A->DR = 0x80000100; // Slot 1 (Right)
-
-    // 5. Enable the SAI
-    SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
-
-    // 6. Optional: Now enable DMA if you are using it
-    // SAI1_Block_A->CR2 |= SAI_xCR2_DMAEN;
-}
+//void SAI_SafeStart(void) {
+//    // 1. Ensure SAI is OFF to allow configuration changes
+//    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
+//
+//    // Force "Free Protocol" (0x0) - Bit 2 in CR1
+//    SAI1_Block_A->CR1 &= ~SAI_xCR1_PRTCFG;
+//    // 2. Clear DMA request and Flush FIFO
+//    SAI1_Block_A->CR2 &= ~SAI_xCR1_DMAEN;
+//    SAI1_Block_A->CR2 |= SAI_xCR2_FFLUSH;
+//
+//    // 3. Clear all error flags (Underrun/Overrun)
+//    SAI1_Block_A->CLRFR = 0xFFFFFFFF;
+//
+//    // 4. PRE-FILL the FIFO (Crucial for avoiding immediate OVRUDR)
+//    // We write 4 words (2 Left/Right pairs) so the SAI has a "buffer"
+//    // the instant it wakes up.
+//    SAI1_Block_A->DR = 0x7FFFFF00; // Slot 0 (Left) - Positive Max
+//    SAI1_Block_A->DR = 0x80000100; // Slot 1 (Right) - Negative Max
+//    SAI1_Block_A->DR = 0x7FFFFF00; // Slot 0 (Left)
+//    SAI1_Block_A->DR = 0x80000100; // Slot 1 (Right)
+//
+//    // 5. Enable the SAI
+//    SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
+//
+//    // 6. Optional: Now enable DMA if you are using it
+//    // SAI1_Block_A->CR2 |= SAI_xCR2_DMAEN;
+//}
 
 
 //void Disable_DCache_Safe(void) {
