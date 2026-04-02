@@ -122,6 +122,7 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
     PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0);
     __DSB();
 
+    //i2s 24bit (default)
     PCM3060_WriteReg(SPIx, PCM3060_REG_CLOCK_SEL, 0x00);
     __DSB();
     //configure dac ctrl1. attenuation l. all ffs. no at.

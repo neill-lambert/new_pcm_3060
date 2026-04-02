@@ -136,6 +136,9 @@ int main(void) {
     // Crucial: Start the Slave block (B) before the Master block (A)
     // so the listener is ready before the talker starts the clock.
     SAI1_Block_B->CR1 |= SAI_xCR1_SAIEN;
+
+    SAI1_Block_A->DR = 0x00000000; // prefill
+    SAI1_Block_A->DR = 0x00000000;
     SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
 
 
@@ -153,10 +156,24 @@ int main(void) {
 //    	    while (!(SAI1_Block_A->SR & SAI_xSR_FREQ));
 //    	    SAI1_Block_A->DR = 0x7FFFFF00; // Send Right (Big Positive)
 
-    		alignment mainAlign = myAlign;
         	static int32_t sawtooth_accumulator = 0;
         	const int32_t increment = 100; // This controls the pitch (Frequency)
 
+        	// N=98, P=10, Q=2, R=2
+//        	RCC->PLL3DIVR = (1 << 24) |   // DIVR3 = 1 (actual 2)
+//        	                (1 << 16) |   // DIVQ3 = 1 (actual 2)
+//        	                (9 << 9)  |   // DIVP3 = 9 (actual 10)
+//        	                (98 << 0);    // DIVN3 = 98
+//
+//        	uint32_t divr = RCC->PLL3DIVR;
+
+        	//0x1011462
+//        	uint16_t var = (divr & 0x1FF);
+//        	var = ((divr >> 9) & 0x7F);
+//        	var = ((divr >> 16) & 0x7F);
+//        	var = ((divr >> 24) & 0x7F);
+
+        	__asm("nop");
 //        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
 //        	    // A simple XORShift or just a messy increment
 //        	    static uint32_t seed = 0x12345678;
@@ -173,108 +190,90 @@ int main(void) {
 //        	    }
 //        	}
 //
-        	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-////        	    // 1. Generate the Raw Wave
-        	    sawtooth_accumulator += increment;
-////        	    tx_buffer[i] = 0x7FFFFF00;
-//////        	    if (i % 2 != 0)
-//////        	    {
-////					// 2. Keep it in the 24-bit range (-8.3M to +8.3M)
-////					// We use the same 'Sign Extension' trick to keep it clean
+       	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++)
+        	{
+//////        	    // 1. Generate the Raw Wave
+        			sawtooth_accumulator += increment;
+//////        	    tx_buffer[i] = 0x7FFFFF00;
+////////        	    if (i % 2 != 0)
+////////        	    {
+//////					// 2. Keep it in the 24-bit range (-8.3M to +8.3M)
+//////					// We use the same 'Sign Extension' trick to keep it clean
 					int32_t signal = (sawtooth_accumulator << 8) >> 8;
-////
-////					// 3. The "Solid Left" TX Align
-////					// Since your RX is 'Solid Left', your TX should be too.
-////					// We move the signal back into the 'Left-Aligned' 32-bit slot
-					tx_buffer[i] = (uint32_t)(signal << 8) >> 1;
-        	    }
+//////
+//////					// 3. The "Solid Left" TX Align
+//////					// Since your RX is 'Solid Left', your TX should be too.
+//////					// We move the signal back into the 'Left-Aligned' 32-bit slot
+					tx_buffer[i] = (uint32_t)(signal << 8);
 //        	}
-        	//sawtooth_accumulator = 0;
+//        	}
 //           	for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
 //                	    // Fill with a VERY large constant instead of a wave
 //                	    // This makes it easier to see in the debugger
 //                	    if (i % 2 == 0) tx_buffer[i] = 0x0FFFFF00; // Should be Left
 //                	    else           tx_buffer[i] = 0x00000000; // Should be Right
-//                	}
+                	}
     } //end while
 } //end main?
 
-static void MX_SAI1_Init(void) {
-    // 1. Enable the Bus Clock (so you can talk to the registers)
+static void MX_SAI1_Init(void)
+{
+    // 1. Enable SAI1 bus clock first
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SAI1);
+    (void)RCC->APB2ENR; // dummy read
 
-    // 1. Ensure the SAI blocks are disabled
+    // 2. Set clock source before reset
+    RCC->D2CCIP1R &= ~(7U << 0);
+    RCC->D2CCIP1R |=  (2U << 0); // PLL3P
+
+    // 3. Wait for PLL3
+    while(!(RCC->CR & RCC_CR_PLL3RDY));
+
+    // 4. Reset SAI peripheral
+    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
+    for(volatile int i=0; i<10000; i++);
+    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
+    for(volatile int i=0; i<10000; i++);
+
+    // 5. Disable both blocks
     SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
     SAI1_Block_B->CR1 &= ~SAI_xCR1_SAIEN;
 
-    // 2. Perform the Peripheral Reset (Crucial to break the HSI lock)
-    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
-    for(volatile int i=0; i<5000; i++); // Long delay for the bus
-    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
+    // 6. Block A - Master TX
+    SAI1_Block_A->CR1 &= ~(0xF << 20); //clear mckdiv
+    SAI1_Block_A->CR1 = (0x0 << SAI_xCR1_MODE_Pos)   |  // Master TX
+                        (0x0 << SAI_xCR1_SYNCEN_Pos)  |  // Asynchronous
+                        (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
+                        (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
+                        (0x2 << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
+                        SAI_xCR1_MCKEN;                   // MCLK out
 
-    //Ensure PLL1 is locked and DIVQ1EN is 1
-    while(((!(RCC->CR & RCC_CR_PLL3RDY))));
+    SAI1_Block_A->CR2 = (0x0 << SAI_xCR2_FTH_Pos);      // FIFO threshold empty
 
-    //saisel to pll3p
+    SAI1_Block_A->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
+                         (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
+                         SAI_xFRCR_FSDEF              |  // FS = channel ID
+                         SAI_xFRCR_FSOFF;                // I2S 1-bit offset
 
-     RCC->D2CCIP1R &= ~(7U << 0);
-     RCC->D2CCIP1R |= (2U << 0);
+    SAI1_Block_A->SLOTR = (0x1 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
+                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (N-1)
+                          (0x3 << 16);                        // enable slot 0 & 1
 
+    // 7. Block B - Slave RX (no MCKEN, no MCKDIV)
+    SAI1_Block_B->CR1 = (0x3 << SAI_xCR1_MODE_Pos)   |  // Slave RX
+                        (0x1 << SAI_xCR1_SYNCEN_Pos)  |  // Sync with Block A
+                        (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
+                        (0x0 << SAI_xCR1_LSBFIRST_Pos);  // MSB first
 
-    LL_RCC_SetSAIClockSource(LL_RCC_SAI1_CLKSOURCE_PLL3P);
-
-    while ((LL_APB2_GRP1_IsEnabledClock(LL_APB2_GRP1_PERIPH_SAI1))!=1);
-    /* SAI1_Block_A: Transmit (Master) */
-    SAI1_Block_A->CR1 = 0; // Disable
-
-    // CR1: Asynchronous Master TX, I2S Free protocol, 24-bit
-    SAI1_Block_A->CR1 = (0 << SAI_xCR1_MODE_Pos) | // 0: Master TX
-                        (0 << SAI_xCR1_SYNCEN_Pos) | // 0: Asynchronous
-                        (7 << SAI_xCR1_DS_Pos) | // 5: 24-bit
-                        (0 << SAI_xCR1_LSBFIRST_Pos) | // 0: MSB first
-                        (2 << SAI_xCR1_MCKDIV_Pos) |
-                        SAI_xCR1_MCKEN; // Master clock enable
-
-    // CR2: FIFO Threshold, MCLK Divider
-    SAI1_Block_A->CR2 = (0 << SAI_xCR2_FTH_Pos); // 0: Empty
-
-
-    // FRCR: Frame length = 64 (2 slots * 32 bits), Active frame length = 32 (FS high for 32 bits)
-    SAI1_Block_A->FRCR = ((64 - 1) << SAI_xFRCR_FRL_Pos) |
-                         ((32 - 1) << SAI_xFRCR_FSALL_Pos) |
-                         (1 << SAI_xFRCR_FSDEF_Pos) | // FS is channel identification
-                         (0 << SAI_xFRCR_FSPOL_Pos) | // 0: FS active low (I2S standard)
-                         (1 << SAI_xFRCR_FSOFF_Pos); // FS 1 bit before data
-
-    //SAI1_Block_A->FRCR &= ~(SAI_xFRCR_FSOFF); // added this to try turning fsoff off.
-    // // SLOTR: 2 slots, each 32-bit, slots 0 and 1 active
-    // SAI1_Block_A->SLOTR = (0 << SAI_xSLOTR_FBOFF_Pos) |
-    //                       (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 2: 32-bit
-    //                       ((2 - 1) << SAI_xSLOTR_NBSLOT_Pos) |
-    //                       SAI_xSLOTR_SLOTEN; // Enable all slots (or at least first 2)
-    // Enable exactly Slot 0 and Slot 1
-    SAI1_Block_A->SLOTR &= ~SAI_xSLOTR_FBOFF; // Clear it
-    SAI1_Block_A->SLOTR |= (1 << SAI_xSLOTR_FBOFF_Pos); // Nudge by 1 bit was tring this nudging. doesnt seem to change the i2s l/r justified problem
-    SAI1_Block_A->SLOTR = //(1 << SAI_xSLOTR_FBOFF_Pos) |
-                          (2 << SAI_xSLOTR_SLOTSZ_Pos) | // 32-bit
-                          (1 << SAI_xSLOTR_NBSLOT_Pos) | // 2 slots (N-1)
-						  (0x3 << 16); // Enable first 4 slots just to see if Left "wakes up"
-
-
-    /* SAI1_Block_B: Receive (Slave) */
-    SAI1_Block_B->CR1 = 0; // Disable
-
-    // CR1: Synchronous Slave RX, 24-bit
-    SAI1_Block_B->CR1 = (3 << SAI_xCR1_MODE_Pos) | // 3: Slave RX
-                        (1 << SAI_xCR1_SYNCEN_Pos) | // 1: Synchronous with other block
-                        (7 << SAI_xCR1_DS_Pos) | // 5: 24-bit
-						(0 << SAI_xCR1_LSBFIRST_Pos) | // 0: MSB first
-						(2 << SAI_xCR1_MCKDIV_Pos) |
-						SAI_xCR1_MCKEN; // Master clock enable
-
-    SAI1_Block_B->FRCR = SAI1_Block_A->FRCR;
-
+    SAI1_Block_B->FRCR  = SAI1_Block_A->FRCR;
     SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
+
+    // 8. Clear flags
+    SAI1_Block_A->CLRFR = 0xFFFFFFFF;
+    SAI1_Block_B->CLRFR = 0xFFFFFFFF;
+
+    // 9. Enable DMA on Block A
+    SAI1_Block_A->CR2 |= SAI_xCR1_DMAEN;
 }
 
 static void MX_SPI4_Init(void) {
@@ -366,6 +365,7 @@ static void MX_DMA_Init(void) {
 
 static void MX_GPIO_Init(void) {
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOA);
+    LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOC);
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOD);
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOE);
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_GPIOF);
@@ -442,6 +442,14 @@ static void MX_GPIO_Init(void) {
     //disabling contentious pe3 af6 pin. enable as op
     LL_GPIO_SetPinMode(GPIOF, LL_GPIO_PIN_6, LL_GPIO_MODE_OUTPUT);
 
+    // Output HSE on MCO2 (PC9) with /4 divider (to slow it down for scope)
+    LL_RCC_ConfigMCO(LL_RCC_MCO2SOURCE_HSE, LL_RCC_MCO2_DIV_1);
+
+    // Configure PC9 as MCO2
+    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetAFPin_8_15(GPIOC, LL_GPIO_PIN_9, LL_GPIO_AF_0);
+    LL_GPIO_SetPinSpeed(GPIOC, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
 }
 
 void SystemClock_Config(void) {
@@ -469,17 +477,35 @@ void SystemClock_Config(void) {
 
     LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
 
-
     LL_RCC_PLL3_Disable();
     while(LL_RCC_PLL3_IsReady()); // wait for it to stop
-    LL_RCC_PLL3_SetM(1);
-    LL_RCC_PLL3_SetN(61);
-    LL_RCC_PLL3_SetP(10); // 49.152MHz / 2 = 24.576MHz MCLK
+//    LL_RCC_PLL3_SetM(5);
+//    LL_RCC_PLL3_SetN(99); // old val 61
+//    LL_RCC_PLL3_SetP(11); // old val 10, but pass p value desired+1,
+//
+//    LL_RCC_PLL3_SetFRACN(2490); //old val 3604
+//    LL_RCC_PLL3FRACN_Enable();
 
-    LL_RCC_PLL3_SetFRACN(3604);
-    LL_RCC_PLL3FRACN_Enable();
-    LL_RCC_PLL3_Enable();
-    while(!LL_RCC_PLL3_IsReady());
+//    LL_RCC_PLL3_SetM(5);
+//    // N=98, P=10, Q=2, R=2
+//	RCC->PLL3DIVR = (1 << 24) |   // DIVR3 = 1 (actual 2)
+//					(1 << 16) |   // DIVQ3 = 1 (actual 2)
+//					(9 << 9)  |   // DIVP3 = 9 (actual 10)
+//					(98 << 0);    // DIVN3 = 98
+
+	LL_RCC_PLL3_SetM(1);  // or write PLLCKSELR directly
+
+	RCC->PLL3DIVR = (1   << 24) |  // DIVR3=1 (actual 2)
+					(1   << 16) |  // DIVQ3=1 (actual 2)
+					(7   <<  9) |  // DIVP3=7 (actual 8)
+					(47  <<  0);   // DIVN3=49
+	LL_RCC_PLL3FRACN_Disable();
+	while (LL_RCC_PLL3FRACN_IsEnabled());
+
+	RCC->PLL3FRACR = (3050 << 3);  // FRACN is bits 15:3
+	LL_RCC_PLL3FRACN_Enable();
+
+	while (LL_RCC_PLL3FRACN_IsEnabled()!=1);
 
     LL_RCC_PLL3_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
     LL_RCC_PLL3_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
@@ -487,25 +513,12 @@ void SystemClock_Config(void) {
     LL_RCC_PLL3P_Enable();
     //LL_RCC_PLL3Q_Enable();
     while (LL_RCC_PLL3P_IsEnabled()!=1);
-
     __DSB();
+
     LL_RCC_PLL3_Enable();
     while(LL_RCC_PLL3_IsReady() != 1);
     // 1. Wait for PLL3RDY (Bit 28 in RCC->CR)
     while(!(RCC->CR & RCC_CR_PLL3RDY));
-
-    // 2. Perform the Hard Reset to break the HSI lock
-    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
-    for(volatile int i=0; i<5000; i++);
-    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
-
-    // 3. Force the Mux to PLL3_P (Value 0x3 or 0x2 depending on H7 rev)
-   // LL_RCC_SetSAIClockSource(LL_RCC_SAI1_CLKSOURCE_PLL3P);
-    // Force the SAI to "Forget" the HSI (Peripheral Reset)
-    // This is the ONLY way to force the internal clock mux to re-sample
-    RCC->APB2RSTR |= RCC_APB2RSTR_SAI1RST;
-    for(volatile int i=0; i<5000; i++); // Wait longer to ensure it clears
-    RCC->APB2RSTR &= ~RCC_APB2RSTR_SAI1RST;
 
     //saisel to pll3p
     RCC->D2CCIP1R &= ~(7U << 0);
@@ -520,6 +533,8 @@ void SystemClock_Config(void) {
           Q = 5 -> PLL1Q = 491.52 / 5 = 98.304 MHz.
           FRACN = 0.304 * 8192 = 2490.
        */
+    LL_RCC_PLL1_Disable();
+
     LL_RCC_PLL1_SetM(1);
     LL_RCC_PLL1_SetN(123);
 
