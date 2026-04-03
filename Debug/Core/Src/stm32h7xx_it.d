@@ -19,6 +19,7 @@ Core/Src/stm32h7xx_it.o: ../Core/Src/stm32h7xx_it.c \
  /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_system.h \
  /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_bus.h \
  /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_system.h \
+ /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/stm32h7xx_it.h \
  /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/stm32h7xx_it.h
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h:
@@ -40,4 +41,5 @@ Core/Src/stm32h7xx_it.o: ../Core/Src/stm32h7xx_it.c \
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_system.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_bus.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_system.h:
+/home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/stm32h7xx_it.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/stm32h7xx_it.h:

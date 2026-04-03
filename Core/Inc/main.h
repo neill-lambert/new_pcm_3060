@@ -13,6 +13,7 @@ extern "C" {
 #include "stm32h7xx_ll_pwr.h"
 #include "stm32h7xx_ll_utils.h"
 #include "stm32h7xx_ll_system.h"
+#include "stm32h7xx_it.h"
 
 typedef enum {
 	left,

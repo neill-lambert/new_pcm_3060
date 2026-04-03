@@ -38,10 +38,18 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
+static void DWT_Delay_ms(uint32_t ms);
+
 //void Disable_DCache_Safe(void);
 //void SAI_SafeStart(void);
 
 int main(void) {
+
+	// One time init
+	*(volatile uint32_t*)0xE0001FB0 = 0xC5ACCE55;  // DWT LAR unlock
+	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+	DWT->CYCCNT = 0;
+	DWT->CTRL  |= DWT_CTRL_CYCCNTENA_Msk;
 
 	PWR->CR3 = (PWR->CR3 & ~(PWR_CR3_BYPASS | PWR_CR3_LDOEN));
     while(!(PWR->CSR1 & PWR_CSR1_ACTVOSRDY));
@@ -73,8 +81,8 @@ int main(void) {
     // memset((void*)rx_buffer, 0, sizeof(rx_buffer));
     // memset((void*)tx_buffer, 0, sizeof(tx_buffer));
     /* Enable I-Cache and D-Cache */
-    //SCB_EnableICache();
-   // SCB_EnableDCache();
+    SCB_EnableICache();
+    SCB_EnableDCache();
     /* Set Priority Grouping */
     NVIC_SetPriorityGrouping(3); // NVIC_PRIORITYGROUP_4: 4 bits for pre-emption priority
 
@@ -108,7 +116,6 @@ int main(void) {
 
     LL_mDelay(10);
 
-
     // 1. Ensure everything is off
     SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
     SAI1_Block_B->CR1 &= ~SAI_xCR1_SAIEN;
@@ -139,13 +146,25 @@ int main(void) {
     SAI1_Block_A->DR = 0x00000000;
     SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
 
-
     PCM3060_Init(SPI4);
-    LL_mDelay(10);
+
+    DWT_Delay_ms(10); //replaces ll m delay.
 
     static int32_t sawtooth_accumulator = 0;
-    const int32_t increment = 100; // This controls the pitch (Frequency)
-
+    const int32_t increment = 2147483648; // 2^31 (Frequency)
+//    The correct formula for signed int32 accumulator:
+//    ```
+//    increment = (2^31 * freq) / sample_rate
+//              = (2147483648 * freq) / 96000
+//    ```
+//
+//    So for common frequencies:
+//    ```
+//    100Hz  =  2236962
+//    440Hz  =  9842632
+//    1kHz   = 22369620
+//    5kHz   = 111848100
+//    10kHz  = 223696210
     while (1)
     {
 
@@ -153,14 +172,11 @@ int main(void) {
 
 		int offset = (audio_buffer_ready == 1) ? 0 : AUDIO_BUFFER_SIZE / 2;
 		audio_buffer_ready = 0;
-       	for (int i = offset; i < offset + AUDIO_BUFFER_SIZE; i+=2)
+       	for (int i = offset; i < offset + AUDIO_BUFFER_SIZE / 2; i+=2)
         	{
 				sawtooth_accumulator += increment;
-				int32_t signal = (sawtooth_accumulator << 8) >> 8;
-				uint32_t sample = (uint32_t)(signal << 8);
-
-				tx_buffer[i] = sample;
-				tx_buffer[i+1] = sample;
+				tx_buffer[i]   = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
+				tx_buffer[i+1] = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
 			}
     } //end while
 } //end main?
@@ -306,9 +322,9 @@ static void MX_DMA_Init(void) {
     LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_1);
 
     /* NVIC configuration for DMA interrupts */
-    NVIC_SetPriority(DMA1_Stream0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
+    NVIC_SetPriority(DMA1_Stream0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 5, 0));
     NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-    NVIC_SetPriority(DMA1_Stream1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
+    NVIC_SetPriority(DMA1_Stream1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 5, 0));
     NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 }
 
@@ -504,15 +520,15 @@ void SystemClock_Config(void) {
     LL_Init1msTick(235000000);
     LL_SetSystemCoreClock(470000000);
 
-    // Force SysTick fully enabled with interrupt
-    SysTick->LOAD = 234999;          // 235MHz / 1000 - 1
-    SysTick->VAL  = 0;               // clear current value
-    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |   // processor clock
-                    SysTick_CTRL_TICKINT_Msk   |   // enable interrupt
-                    SysTick_CTRL_ENABLE_Msk;       // start counter
-    // Check SysTick is actually configured
-    uint32_t reload = SysTick->LOAD;   // should be ~235000 for 1ms tick
-    uint32_t ctrl   = SysTick->CTRL;   // should have bits 0,1,2 set
+//    // Force SysTick fully enabled with interrupt
+//    SysTick->LOAD = 234999;          // 235MHz / 1000 - 1
+//    SysTick->VAL  = 0;               // clear current value
+//    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |   // processor clock
+//                    SysTick_CTRL_TICKINT_Msk   |   // enable interrupt
+//                    SysTick_CTRL_ENABLE_Msk;       // start counter
+//    // Check SysTick is actually configured
+//    uint32_t reload = SysTick->LOAD;   // should be ~235000 for 1ms tick
+//    uint32_t ctrl   = SysTick->CTRL;   // should have bits 0,1,2 set
 
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL1);
     while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL1);
@@ -537,6 +553,11 @@ void SystemClock_Config(void) {
 
 }
 
+static void DWT_Delay_ms(uint32_t ms)
+{
+	uint32_t start = DWT->CYCCNT;
+    while((DWT->CYCCNT - start) < 235000);  // exactly 1ms at 235MHz}
+}
 //void SAI_SafeStart(void) {
 //    // 1. Ensure SAI is OFF to allow configuration changes
 //    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;

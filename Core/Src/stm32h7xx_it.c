@@ -47,6 +47,16 @@ volatile uint8_t audio_buffer_ready = 0;
 /*            Cortex-M7 Processor Exceptions Handlers                         */
 /******************************************************************************/
 
+void WWDG1_IRQHandler(void)
+{
+	__asm("nop");
+}
+
+void RCC_IRQHandler(void)
+{
+    // clear all RCC interrupt flags
+    RCC->CICR = 0xFFFFFFFF;
+}
 /**
   * @brief  This function handles NMI exception.
   * @param  None
@@ -156,8 +166,9 @@ void SysTick_Handler(void)
 /**
   * @brief  This function handles DMA1 Stream 0 interrupt (TX).
   */
-void DMA1_Stream0_IRQHandler(void)
+void DMA_STR0_IRQHandler(void)
 {
+    LL_GPIO_TogglePin(GPIOE, LL_GPIO_PIN_1);  // any free GPIO
   if (LL_DMA_IsActiveFlag_HT0(DMA1))
   {
     LL_DMA_ClearFlag_HT0(DMA1);
@@ -177,16 +188,16 @@ void DMA1_Stream0_IRQHandler(void)
 /**
   * @brief  This function handles DMA1 Stream 1 interrupt (RX).
   */
-void DMA1_Stream1_IRQHandler(void)
+void DMA_STR1_IRQHandler(void)
 {
   if (LL_DMA_IsActiveFlag_HT1(DMA1))
   {
     LL_DMA_ClearFlag_HT1(DMA1);
     /* Invalidate the first half of the RX buffer to ensure CPU sees DMA updates */
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
-    uint32_t sample = rx_buffer[0];
-	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
-	else myAlign = right;
+//    uint32_t sample = rx_buffer[0];
+//	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
+//	else myAlign = right;
   }
   if (LL_DMA_IsActiveFlag_TC1(DMA1))
   {
@@ -194,9 +205,9 @@ void DMA1_Stream1_IRQHandler(void)
     /* Invalidate the second half of the RX buffer to ensure CPU sees DMA updates */
 
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
-    uint32_t sample = rx_buffer[0];
-	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
-	else myAlign = right;
+//    uint32_t sample = rx_buffer[0];
+//	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
+//	else myAlign = right;
   }
 }
 
