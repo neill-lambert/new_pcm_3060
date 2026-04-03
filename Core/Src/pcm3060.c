@@ -119,7 +119,7 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
 //    __DSB();
 
 
-    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0);
+    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0); //old val 0xc0
     __DSB();
 
     //i2s 24bit (default)
@@ -140,5 +140,6 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
     // unmute softmutes.
     PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_OS_S_MUTE, 0x00);
 
+    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_CLOCK_SEL, 0X00);
     //config wait until txe empty here.
 }

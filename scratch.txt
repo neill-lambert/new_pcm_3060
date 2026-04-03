@@ -8,11 +8,7 @@ spi4        pe12        spi sck     mc/scl/fmt      1
             because on the 3060, dout is shared with miso. so we config this
             write only. could be a problem during debug...
  --------------------------------------------------------------
- sai1       pe2         sai mck     sck1/2          6 tied to 9. 24.576mhz
-            pe4         sai fs      lrck1/2         4 / 11. 96k
-            pe5         sai sck     bclk1/2         5 / 10. 6.144mhz
-            pe6         sda         din             12.
-            pe3         sdb         dout            3.
+72
  --------------------------------------------------------------
  rst        pe15        rst         rst             15.
  mode       pe11        mode        mode            28.

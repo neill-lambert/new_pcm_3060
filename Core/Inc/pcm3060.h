@@ -12,7 +12,7 @@
 #define PCM3060_REG_DAC_FILTER         69
 #define PCM3060_REG_ADC_ATTEN_L         70
 #define PCM3060_REG_ADC_ATTEN_R         71
-
+#define PCM3060_REG_ADC_CLOCK_SEL		72
 
 /* PCM3060 Configuration Functions */
 void PCM3060_Init(SPI_TypeDef *SPIx);

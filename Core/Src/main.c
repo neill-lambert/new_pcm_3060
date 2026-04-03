@@ -174,9 +174,11 @@ int main(void) {
 		audio_buffer_ready = 0;
        	for (int i = offset; i < offset + AUDIO_BUFFER_SIZE / 2; i+=2)
         	{
-				sawtooth_accumulator += increment;
-				tx_buffer[i]   = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
-				tx_buffer[i+1] = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
+//				sawtooth_accumulator += increment;
+//				tx_buffer[i]   = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
+//				tx_buffer[i+1] = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
+       			tx_buffer[i] = rx_buffer[i];
+       			tx_buffer[i+1] = rx_buffer[i+1];
 			}
     } //end while
 } //end main?
@@ -230,9 +232,17 @@ static void MX_SAI1_Init(void)
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
                         (0x0 << SAI_xCR1_LSBFIRST_Pos);  // MSB first
 
-    SAI1_Block_B->FRCR  = SAI1_Block_A->FRCR;
-    SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
+    //SAI1_Block_B->FRCR  = SAI1_Block_A->FRCR;
+    SAI1_Block_B->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
+                         (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
+                          SAI_xFRCR_FSDEF           |  // FS = channel ID
+                          SAI_xFRCR_FSOFF       |         // I2S 1-bit offset
+                          SAI_xFRCR_FSPOL;
 
+   // SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
+    SAI1_Block_B->SLOTR = (0x1 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit
+                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots
+                          (0x2 << 16);                        // slot 1 only
     // 8. Clear flags
     SAI1_Block_A->CLRFR = 0xFFFFFFFF;
     SAI1_Block_B->CLRFR = 0xFFFFFFFF;
