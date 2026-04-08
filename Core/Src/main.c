@@ -38,7 +38,6 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
-static void DWT_Delay_ms(uint32_t ms);
 
 //void Disable_DCache_Safe(void);
 //void SAI_SafeStart(void);
@@ -63,6 +62,8 @@ int main(void) {
     // 2. Wait for the VOSRDY flag
 	while (LL_PWR_IsActiveFlag_VOS() == 0);
 
+	//RCC->APB4ENR |= RCC_APB4ENR_SYSCFGEN;
+
     // 3. Enable the VOS0 (Scale 0) for boosted performance
     LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
 
@@ -70,11 +71,12 @@ int main(void) {
 	while (LL_PWR_IsActiveFlag_VOS() == 0);
 
 
-    // Use a simple loop to force the ECC to initialize
-    for(int i=0; i < AUDIO_BUFFER_SIZE; i++) {
-        rx_buffer[i] = 0;
-        tx_buffer[i] = 0;
-    }
+//    // Use a simple loop to force the ECC to initialize
+//    for(int i=0; i < AUDIO_BUFFER_SIZE; i++) {
+//        rx_buffer[i] = 0;
+//        tx_buffer[i] = 0;
+//    }
+
     __DSB(); // Ensure writes are finished
     //SCB_CleanDCache_by_Addr((uint32_t*)rx_buffer, sizeof(rx_buffer));
 
@@ -83,6 +85,12 @@ int main(void) {
     /* Enable I-Cache and D-Cache */
     SCB_EnableICache();
     SCB_EnableDCache();
+
+	// Before enabling SAI/DMA, fill buffer with known value
+	for(int i = 0; i < AUDIO_BUFFER_SIZE; i++)
+	{
+	    rx_buffer[i] = 0xDEADBEEF;
+	}
     /* Set Priority Grouping */
     NVIC_SetPriorityGrouping(3); // NVIC_PRIORITYGROUP_4: 4 bits for pre-emption priority
 
@@ -90,31 +98,27 @@ int main(void) {
 
     //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
+    DWT_Delay_ms(10);
+    LL_GPIO_ResetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin); // Active Low Reset
+    DWT_Delay_ms(50);
+
     MX_DMA_Init();
     MX_SPI4_Init();
     MX_SAI1_Init();
-
-    /* Initialize PCM3060 via SPI4 */
-    LL_GPIO_ResetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin); // Active Low Reset
-    LL_mDelay(100);
-    LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
-    LL_mDelay(10);
-
+    DWT_Delay_ms(10);
     /* Start Audio Streaming via SAI DMA (TDM mode) */
 
     /* SAI1 Block B (RX) DMA Start */
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_1, (uint32_t)rx_buffer);
     LL_DMA_SetPeriphAddress(DMA1, LL_DMA_STREAM_1, (uint32_t)&SAI1_Block_B->DR);
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_1, AUDIO_BUFFER_SIZE);
-    //LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1);
 
     /* SAI1 Block A (TX) DMA Start */
     LL_DMA_SetMemoryAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)tx_buffer);
     LL_DMA_SetPeriphAddress(DMA1, LL_DMA_STREAM_0, (uint32_t)&SAI1_Block_A->DR);
     LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
-    //LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0);
 
-    LL_mDelay(10);
+    DWT_Delay_ms(10);
 
     // 1. Ensure everything is off
     SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;
@@ -122,36 +126,51 @@ int main(void) {
     SAI1_Block_A->CR1 &= ~SAI_xCR1_DMAEN;
     SAI1_Block_B->CR1 &= ~SAI_xCR1_DMAEN;
 
+    LL_GPIO_SetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin);
+
+    DWT_Delay_ms(100);
+
+    PCM3060_Init(SPI4);
+
+    DWT_Delay_ms(100); //replaces ll m delay.
+
     // 2. Flush the FIFOs to clear "Ghost Data"
     SAI1_Block_A->CR2 |= SAI_xCR2_FFLUSH;
     SAI1_Block_B->CR2 |= SAI_xCR2_FFLUSH;
-
-   // SAI_SafeStart();
-
 
     // 3. Set the DMA request bits FIRST (The "Door" is open)
     SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
     SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
 
-    // 4. Enable the DMA Streams (The "Servant" is waiting)
-    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0); // RX
-    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1); // TX
 
-    // 5. START THE CLOCK LAST (The "Master" starts the race)
     // Crucial: Start the Slave block (B) before the Master block (A)
     // so the listener is ready before the talker starts the clock.
     SAI1_Block_B->CR1 |= SAI_xCR1_SAIEN;
-
-    SAI1_Block_A->DR = 0x00000000; // prefill
-    SAI1_Block_A->DR = 0x00000000;
+    __DSB();
+    for(volatile int i = 0; i < 1000; i++);  // let Block B lock to frame sync
     SAI1_Block_A->CR1 |= SAI_xCR1_SAIEN;
 
-    PCM3060_Init(SPI4);
+    // Wait for Block B FIFO to start filling - confirms frame lock
+    uint32_t timeout = 100000;
+    while((SAI1_Block_B->SR & SAI_xSR_FLVL) == 0 && timeout--)
+    {
+        __NOP();
+    }
 
-    DWT_Delay_ms(10); //replaces ll m delay.
+    if(timeout == 0)
+    {
+        // Block B never locked - trap here
+        while(1);
+    }
+    // 4. Enable the DMA Streams (The "Servant" is waiting)
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0); // tx
+    LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1); // rx
+
+
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
 
     static int32_t sawtooth_accumulator = 0;
-    const int32_t increment = 2147483648; // 2^31 (Frequency)
+    const int32_t increment = 44739243/2; // 2^31 (Frequency)
 //    The correct formula for signed int32 accumulator:
 //    ```
 //    increment = (2^31 * freq) / sample_rate
@@ -165,20 +184,22 @@ int main(void) {
 //    1kHz   = 22369620
 //    5kHz   = 111848100
 //    10kHz  = 223696210
+
     while (1)
     {
 
     	while (audio_buffer_ready == 0){};
-
 		int offset = (audio_buffer_ready == 1) ? 0 : AUDIO_BUFFER_SIZE / 2;
 		audio_buffer_ready = 0;
        	for (int i = offset; i < offset + AUDIO_BUFFER_SIZE / 2; i+=2)
         	{
-//				sawtooth_accumulator += increment;
-//				tx_buffer[i]   = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
-//				tx_buffer[i+1] = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
-       			tx_buffer[i] = rx_buffer[i];
-       			tx_buffer[i+1] = rx_buffer[i+1];
+			//	sawtooth_accumulator += increment;
+			//	tx_buffer[i+1]   = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
+	//			tx_buffer[i] = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
+     		//	tx_buffer[i] = rx_buffer[i+1] & 0xFFFFFF00;
+//        		tx_buffer[i+1] = rx_buffer[i+1];
+				// 	tx_buffer[i+1] = rx_buffer[i];// & 0xFFFFFF00;
+				//	tx_buffer[i+1] = 100000000;
 			}
     } //end while
 } //end main?
@@ -212,17 +233,21 @@ static void MX_SAI1_Init(void)
                         (0x0 << SAI_xCR1_SYNCEN_Pos)  |  // Asynchronous
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
                         (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
-                        (0x2 << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
+                        (3U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
                         SAI_xCR1_MCKEN;                   // MCLK out
+    SAI1_Block_A->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
 
     SAI1_Block_A->CR2 = (0x0 << SAI_xCR2_FTH_Pos);      // FIFO threshold empty
 
+
     SAI1_Block_A->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
                          (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
-                         SAI_xFRCR_FSDEF              |  // FS = channel ID
-                         SAI_xFRCR_FSOFF;                // I2S 1-bit offset
+						 SAI_xFRCR_FSOFF			|
+						 SAI_xFRCR_FSDEF;//             |  // FS = channel ID
 
-    SAI1_Block_A->SLOTR = (0x1 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
+   // SAI1_Block_A->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
+
+    SAI1_Block_A->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
                           (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (N-1)
                           (0x3 << 16);                        // enable slot 0 & 1
 
@@ -231,24 +256,30 @@ static void MX_SAI1_Init(void)
                         (0x1 << SAI_xCR1_SYNCEN_Pos)  |  // Sync with Block A
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
                         (0x0 << SAI_xCR1_LSBFIRST_Pos);  // MSB first
+    SAI1_Block_B->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
 
     //SAI1_Block_B->FRCR  = SAI1_Block_A->FRCR;
     SAI1_Block_B->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
                          (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
-                          SAI_xFRCR_FSDEF           |  // FS = channel ID
-                          SAI_xFRCR_FSOFF       |         // I2S 1-bit offset
+                          SAI_xFRCR_FSDEF            |  // FS = channel ID
+                          SAI_xFRCR_FSOFF			|                 // I2S 1-bit offset
                           SAI_xFRCR_FSPOL;
 
+   // SAI1_Block_B->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
+
    // SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
-    SAI1_Block_B->SLOTR = (0x1 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit
-                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots
-                          (0x2 << 16);                        // slot 1 only
+    SAI1_Block_B->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
+                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (n-1)
+                          (0x3 << 16);                        // slots 0 and 1
     // 8. Clear flags
     SAI1_Block_A->CLRFR = 0xFFFFFFFF;
     SAI1_Block_B->CLRFR = 0xFFFFFFFF;
 
     // 9. Enable DMA on Block A
-    SAI1_Block_A->CR2 |= SAI_xCR1_DMAEN;
+    SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
+    //and on block b
+    SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
+
 }
 
 static void MX_SPI4_Init(void) {
@@ -389,7 +420,7 @@ static void MX_GPIO_Init(void) {
     LL_GPIO_SetAFPin_0_7(GPIOE, LL_GPIO_PIN_3, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOE, LL_GPIO_PIN_3, LL_GPIO_SPEED_FREQ_VERY_HIGH);
     GPIOE->PUPDR &= ~(3U << (3 * 2));
-    GPIOE->PUPDR |= (0U << (3 * 2)); // 00: No Pull-up
+    GPIOE->PUPDR |= (1U << (3 * 2)); // 00: No Pull-up
     // 1. Enable GPIOE Clock
 //    RCC->AHB4ENR |= RCC_AHB4ENR_GPIOEEN;
 //
@@ -418,12 +449,20 @@ static void MX_GPIO_Init(void) {
     LL_GPIO_SetPinMode(GPIOF, LL_GPIO_PIN_6, LL_GPIO_MODE_OUTPUT);
 
     // Output HSE on MCO2 (PC9) with /4 divider (to slow it down for scope)
-    LL_RCC_ConfigMCO(LL_RCC_MCO2SOURCE_HSE, LL_RCC_MCO2_DIV_1);
+    LL_RCC_ConfigMCO(LL_RCC_MCO2SOURCE_HSE, LL_RCC_MCO2_DIV_4);
 
     // Configure PC9 as MCO2
     LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOC, LL_GPIO_PIN_9, LL_GPIO_AF_0);
     LL_GPIO_SetPinSpeed(GPIOC, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+
+    // config pc6 as output for toggling.
+    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_6, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_ResetOutputPin(GPIOC, LL_GPIO_PIN_6);
+    LL_GPIO_SetPinSpeed(GPIOC, LL_GPIO_PIN_6, LL_GPIO_SPEED_MEDIUM);
+    LL_GPIO_SetPinOutputType(GPIOC, LL_GPIO_PIN_6, LL_GPIO_OUTPUT_PUSHPULL);
+    LL_GPIO_SetPinPull(GPIOC, LL_GPIO_PIN_6, LL_GPIO_PULL_NO);
+
 
 }
 
@@ -448,6 +487,7 @@ void SystemClock_Config(void) {
        Q = 5 -> PLL1Q = 491.52 / 5 = 98.304 MHz.
        FRACN = 0.304 * 8192 = 2490.
     */
+	//mco2 reads hse @ 8.088339916
 	while ((LL_RCC_HSE_IsReady()!=1));
 
     LL_RCC_PLL_SetSource(LL_RCC_PLLSOURCE_HSE);
@@ -467,20 +507,45 @@ void SystemClock_Config(void) {
 //					(1 << 16) |   // DIVQ3 = 1 (actual 2)
 //					(9 << 9)  |   // DIVP3 = 9 (actual 10)
 //					(98 << 0);    // DIVN3 = 98
-
-	LL_RCC_PLL3_SetM(1);  // or write PLLCKSELR directly
-
-	RCC->PLL3DIVR = (1   << 24) |  // DIVR3=1 (actual 2)
-					(1   << 16) |  // DIVQ3=1 (actual 2)
-					(7   <<  9) |  // DIVP3=7 (actual 8)
-					(47  <<  0);   // DIVN3=49
-	LL_RCC_PLL3FRACN_Disable();
-	while (LL_RCC_PLL3FRACN_IsEnabled()){};
-
-	RCC->PLL3FRACR = (3050 << 3);  // FRACN is bits 15:3
-	LL_RCC_PLL3FRACN_Enable();
-
-	while (LL_RCC_PLL3FRACN_IsEnabled()!=1);
+//
+//	LL_RCC_PLL3_SetM(1);  // or write PLLCKSELR directly
+//
+//	RCC->PLL3DIVR = (1   << 24) |  // DIVR3=1 (actual 2)
+//					(1   << 16) |  // DIVQ3=1 (actual 2)
+//					(7   <<  9) |  // DIVP3=7 (actual 8)
+//					(47  <<  0);   // DIVN3=49
+//	LL_RCC_PLL3FRACN_Disable();
+//	while (LL_RCC_PLL3FRACN_IsEnabled()){};
+//
+//	RCC->PLL3FRACR = (3050 << 3);  // FRACN is bits 15:3
+//	LL_RCC_PLL3FRACN_Enable();
+//
+//	while (LL_RCC_PLL3FRACN_IsEnabled()!=1);
+//	LL_RCC_PLL3_SetM(4);  // or write PLLCKSELR directly
+//
+//	RCC->PLL3DIVR = (1   << 24) |
+//					(1   << 16) |
+//					(7  <<  9) |
+//					(96  <<  0);
+//	48 kHz Configuration (Target 12.288 MHz)
+//
+//    M: 5 (
+//    )
+//    N: 226 (Write 226 to DIVN, multipliers by 227)
+//    P: 30 (Write 29 to DIVP, divides by 30)
+//    Result: 12.2882 MHz (Error: 0.002%)
+    LL_RCC_PLL3_SetM(2);  // or write PLLCKSELR directly
+    RCC->PLL3DIVR = (1   << 24) |
+					(1   << 16) |
+					(9  <<  9) |
+					(120  <<  0);
+//	LL_RCC_PLL3FRACN_Disable();
+//	while (LL_RCC_PLL3FRACN_IsEnabled()){};
+//
+//	RCC->PLL3FRACR = (3050 << 3);  // FRACN is bits 15:3
+//	LL_RCC_PLL3FRACN_Enable();
+//
+//	while (LL_RCC_PLL3FRACN_IsEnabled()!=1);
 
     LL_RCC_PLL3_SetVCOInputRange(LL_RCC_PLLINPUTRANGE_4_8);
     LL_RCC_PLL3_SetVCOOutputRange(LL_RCC_PLLVCORANGE_WIDE);
@@ -563,11 +628,7 @@ void SystemClock_Config(void) {
 
 }
 
-static void DWT_Delay_ms(uint32_t ms)
-{
-	uint32_t start = DWT->CYCCNT;
-    while((DWT->CYCCNT - start) < 235000);  // exactly 1ms at 235MHz}
-}
+
 //void SAI_SafeStart(void) {
 //    // 1. Ensure SAI is OFF to allow configuration changes
 //    SAI1_Block_A->CR1 &= ~SAI_xCR1_SAIEN;

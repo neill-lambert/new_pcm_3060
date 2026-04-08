@@ -15,6 +15,9 @@ extern "C" {
 #include "stm32h7xx_ll_system.h"
 #include "stm32h7xx_it.h"
 
+static void DWT_Delay_ms(uint32_t ms);
+
+
 typedef enum {
 	left,
 	right
@@ -28,6 +31,12 @@ void Error_Handler(void);
 #define PCM3060_RST_GPIO_Port GPIOE
 #define PCM3060_MODE_Pin LL_GPIO_PIN_11
 #define PCM3060_MODE_GPIO_Port GPIOE
+
+static void DWT_Delay_ms(uint32_t ms)
+{
+	uint32_t start = DWT->CYCCNT;
+    while((DWT->CYCCNT - start) < 235000);  // exactly 1ms at 235MHz}
+}
 
 #ifdef __cplusplus
 }

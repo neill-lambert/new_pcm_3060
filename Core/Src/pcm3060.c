@@ -119,27 +119,41 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
 //    __DSB();
 
 
-    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xC0); //old val 0xc0
-    __DSB();
+    PCM3060_WriteReg(SPIx, PCM3060_REG_MRST_ADPS, 0xA7D8C1); //old val 0xc0
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(50);  // wait for reset to complete
 
-    //i2s 24bit (default)
-    PCM3060_WriteReg(SPIx, PCM3060_REG_CLOCK_SEL, 0x00);
-    __DSB();
+    //i2s 24bit (default) // also turn on bit7, clock sel input 1 (same as adc)
+    PCM3060_WriteReg(SPIx, PCM3060_REG_CLOCK_SEL, (1 << 7));
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(5);  // wait for reset to complete
     //configure dac ctrl1. attenuation l. all ffs. no at.
     PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_ATTEN_L, 0xFF);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(5);  // wait for reset to complete
 
     //configure dac ctrl1. attenuation r. all ffs. no at.
     PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_ATTEN_R, 0xFF);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(5);  // wait for reset to complete
 
     // Configure ADC Control 2: attenuation l. 1101 0111b 215 = 0db.
     PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_L, 0xD7);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(5);  // wait for reset to complete
 
     // Configure ADC Control 2: attenuation r. 1101 0111b 215 = 0db.
     PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_R, 0xD7);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(5);  // wait for reset to complete
 
     // unmute softmutes.
     PCM3060_WriteReg(SPIx, PCM3060_REG_DAC_OS_S_MUTE, 0x00);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(5);  // wait for reset to complete
 
     PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_CLOCK_SEL, 0X00);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    DWT_Delay_ms(50);  // wait for reset to complete
     //config wait until txe empty here.
 }

@@ -39,7 +39,8 @@ extern int32_t tx_buffer[AUDIO_BUFFER_SIZE];
 extern int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
 volatile uint8_t audio_buffer_ready = 0;
-
+volatile uint32_t tx_irq_count = 0;
+volatile uint32_t rx_irq_count = 0;
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -175,6 +176,12 @@ void DMA_STR0_IRQHandler(void)
     /* Clean the first half of the TX buffer to ensure DMA sees CPU updates */
     SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
     audio_buffer_ready = 1;
+    // SYNC COPY: Copy First Half
+    for(int i = 0; i < 256; i++)
+	   {
+		   tx_buffer[i] = rx_buffer[i];
+	   }
+
   }
   if (LL_DMA_IsActiveFlag_TC0(DMA1))
   {
@@ -182,6 +189,12 @@ void DMA_STR0_IRQHandler(void)
     /* Clean the second half of the TX buffer to ensure DMA sees CPU updates */
     SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
     audio_buffer_ready = 2;
+    // SYNC COPY: Copy Second Half
+   for(int i = 256; i < 512; i++)
+	   {
+		   tx_buffer[i] = rx_buffer[i];
+	   }
+    tx_irq_count++;
   }
 }
 
@@ -205,6 +218,7 @@ void DMA_STR1_IRQHandler(void)
     /* Invalidate the second half of the RX buffer to ensure CPU sees DMA updates */
 
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    rx_irq_count++;
 //    uint32_t sample = rx_buffer[0];
 //	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
 //	else myAlign = right;

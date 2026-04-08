@@ -2,6 +2,7 @@
 #define PCM3060_H
 
 #include "stm32h7xx_ll_spi.h"
+#include "main.h"
 
 /* PCM3060 Registers */
 #define PCM3060_REG_MRST_ADPS          64
