@@ -1,11 +1,6 @@
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_gpio.h:942:22:LL_GPIO_TogglePin	1
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2073:26:LL_DMA_IsActiveFlag_HT0	2
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2084:26:LL_DMA_IsActiveFlag_HT1	2
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2161:26:LL_DMA_IsActiveFlag_TC0	2
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2172:26:LL_DMA_IsActiveFlag_TC1	2
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2513:22:LL_DMA_ClearFlag_HT0	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2524:22:LL_DMA_ClearFlag_HT1	1
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2601:22:LL_DMA_ClearFlag_TC0	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2612:22:LL_DMA_ClearFlag_TC1	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h:35:13:DWT_Delay_ms	2
 ../Core/Src/stm32h7xx_it.c:51:6:WWDG1_IRQHandler	1
@@ -19,5 +14,4 @@
 ../Core/Src/stm32h7xx_it.c:136:6:DebugMon_Handler	1
 ../Core/Src/stm32h7xx_it.c:145:6:PendSV_Handler	1
 ../Core/Src/stm32h7xx_it.c:154:6:SysTick_Handler	1
-../Core/Src/stm32h7xx_it.c:170:6:DMA_STR0_IRQHandler	9
-../Core/Src/stm32h7xx_it.c:204:6:DMA_STR1_IRQHandler	7
+../Core/Src/stm32h7xx_it.c:203:6:DMA_STR1_IRQHandler	13

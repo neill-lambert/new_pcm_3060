@@ -167,36 +167,35 @@ void SysTick_Handler(void)
 /**
   * @brief  This function handles DMA1 Stream 0 interrupt (TX).
   */
-void DMA_STR0_IRQHandler(void)
-{
-    LL_GPIO_TogglePin(GPIOE, LL_GPIO_PIN_1);  // any free GPIO
-  if (LL_DMA_IsActiveFlag_HT0(DMA1))
-  {
-    LL_DMA_ClearFlag_HT0(DMA1);
-    /* Clean the first half of the TX buffer to ensure DMA sees CPU updates */
-    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
-    audio_buffer_ready = 1;
-    // SYNC COPY: Copy First Half
-    for(int i = 0; i < 256; i++)
-	   {
-		   tx_buffer[i] = rx_buffer[i];
-	   }
-
-  }
-  if (LL_DMA_IsActiveFlag_TC0(DMA1))
-  {
-    LL_DMA_ClearFlag_TC0(DMA1);
-    /* Clean the second half of the TX buffer to ensure DMA sees CPU updates */
-    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
-    audio_buffer_ready = 2;
-    // SYNC COPY: Copy Second Half
-   for(int i = 256; i < 512; i++)
-	   {
-		   tx_buffer[i] = rx_buffer[i];
-	   }
-    tx_irq_count++;
-  }
-}
+//void DMA_STR0_IRQHandler(void)
+//{
+//  if (LL_DMA_IsActiveFlag_HT0(DMA1))
+//  {
+//    LL_DMA_ClearFlag_HT0(DMA1);
+//    /* Clean the first half of the TX buffer to ensure DMA sees CPU updates */
+//    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+//    audio_buffer_ready = 1;
+//    // SYNC COPY: Copy First Half
+//    for(int i = 0; i < 256; i++)
+//	   {
+//		   tx_buffer[i] = rx_buffer[i];
+//	   }
+//
+//  }
+//  if (LL_DMA_IsActiveFlag_TC0(DMA1))
+//  {
+//    LL_DMA_ClearFlag_TC0(DMA1);
+//    /* Clean the second half of the TX buffer to ensure DMA sees CPU updates */
+//    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+//    audio_buffer_ready = 2;
+//    // SYNC COPY: Copy Second Half
+//   for(int i = 256; i < 512; i++)
+//	   {
+//		   tx_buffer[i] = rx_buffer[i];
+//	   }
+//    tx_irq_count++;
+//  }
+//}
 
 /**
   * @brief  This function handles DMA1 Stream 1 interrupt (RX).
@@ -208,9 +207,14 @@ void DMA_STR1_IRQHandler(void)
     LL_DMA_ClearFlag_HT1(DMA1);
     /* Invalidate the first half of the RX buffer to ensure CPU sees DMA updates */
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
-//    uint32_t sample = rx_buffer[0];
-//	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
-//	else myAlign = right;
+
+    // Copy First Half
+      for(int i = 0; i < 256; i++)
+  	   {
+  		   tx_buffer[i] = rx_buffer[i];
+  	   }
+    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+
   }
   if (LL_DMA_IsActiveFlag_TC1(DMA1))
   {
@@ -219,9 +223,12 @@ void DMA_STR1_IRQHandler(void)
 
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
     rx_irq_count++;
-//    uint32_t sample = rx_buffer[0];
-//	if (sample > 0x00FFFFFF && sample < 0xFF000000) myAlign = left;
-//	else myAlign = right;
+    // Copy Second Half
+   for(int i = 256; i < 512; i++)
+	   {
+		   tx_buffer[i] = rx_buffer[i];
+	   }
+    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
 }
 

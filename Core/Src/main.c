@@ -232,45 +232,71 @@ static void MX_SAI1_Init(void)
     SAI1_Block_A->CR1 = (0x0 << SAI_xCR1_MODE_Pos)   |  // Master TX
                         (0x0 << SAI_xCR1_SYNCEN_Pos)  |  // Asynchronous
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
-                        (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
+                        (0x1 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
                         (4U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
+						SAI_xCR1_CKSTR				|  // CKSTR=0 = sample on rising edge
                         SAI_xCR1_MCKEN;                   // MCLK out
-    SAI1_Block_A->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
+    //SAI1_Block_A->CR1 &= ~SAI_xCR1_CKSTR;
 
     SAI1_Block_A->CR2 = (0x0 << SAI_xCR2_FTH_Pos);      // FIFO threshold empty
 
 
     SAI1_Block_A->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
-                         (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
-						 SAI_xFRCR_FSOFF			|
-						 SAI_xFRCR_FSDEF;//             |  // FS = channel ID
+                         (31<< SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active|
+						 SAI_xFRCR_FSDEF             |  // FS = channel ID
+						 SAI_xFRCR_FSOFF;// 		 |
+						// SAI_xFRCR_FSPOL;
 
-   // SAI1_Block_A->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
+    //SAI1_Block_A->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
 
     SAI1_Block_A->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
                           (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (N-1)
+						  (0x8 << SAI_xSLOTR_FBOFF_Pos)		|	// fboff
                           (0x3 << 16);                        // enable slot 0 & 1
 
-    // 7. Block B - Slave RX (no MCKEN, no MCKDIV)
-    SAI1_Block_B->CR1 = (0x3 << SAI_xCR1_MODE_Pos)   |  // Slave RX
-                        (0x1 << SAI_xCR1_SYNCEN_Pos)  |  // Sync with Block A
-                        (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
-                        (0x0 << SAI_xCR1_LSBFIRST_Pos);  // MSB first
-    SAI1_Block_B->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
+    // Block B - Slave RX (no MCKEN, no MCKDIV)
+    SAI1_Block_B->CR1 =    (0x3 << SAI_xCR1_MODE_Pos)   |  // Slave RX
+                           (0x1 << SAI_xCR1_SYNCEN_Pos)  |  // Sync with Block A
+                           (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
+						   (0x1 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
+						   SAI_xCR1_CKSTR;
+    //SAI1_Block_B->CR1 &= ~SAI_xCR1_CKSTR;
 
-    //SAI1_Block_B->FRCR  = SAI1_Block_A->FRCR;
+    SAI1_Block_B->CR2 = (0x0 << SAI_xCR2_FTH_Pos);      // FIFO threshold empty
+
+
     SAI1_Block_B->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
-                         (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
-                          SAI_xFRCR_FSDEF            |  // FS = channel ID
-                          SAI_xFRCR_FSOFF			|                 // I2S 1-bit offset
-                          SAI_xFRCR_FSPOL;
+                         (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active|
+						 SAI_xFRCR_FSDEF             |  // FS = channel ID
+						 SAI_xFRCR_FSOFF;// 		 |
+						 //SAI_xFRCR_FSPOL;
 
-   // SAI1_Block_B->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
+    //SAI1_Block_B->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
 
-   // SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
     SAI1_Block_B->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
-                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (n-1)
-                          (0x3 << 16);                        // slots 0 and 1
+                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (N-1)
+						  (0x8 << SAI_xSLOTR_FBOFF_Pos)		|	// fboff
+                          (0x3 << 16);                        // enable slot 0 & 1
+
+
+//    SAI1_Block_B->CR1 = (0x3 << SAI_xCR1_MODE_Pos)   |  // Slave RX
+//                        (0x1 << SAI_xCR1_SYNCEN_Pos)  |  // Sync with Block A
+//                        (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
+//                        (0x1 << SAI_xCR1_LSBFIRST_Pos);  // MSB first
+//    SAI1_Block_B->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
+//
+//    //SAI1_Block_B->FRCR  = SAI1_Block_A->FRCR;
+//    SAI1_Block_B->FRCR = (63 << SAI_xFRCR_FRL_Pos)   |  // 64-bit frame
+//                         (31 << SAI_xFRCR_FSALL_Pos)  |  // 32-bit FS active
+//                          SAI_xFRCR_FSDEF            |  // FS = channel ID
+//                          SAI_xFRCR_FSOFF			|			                 // I2S 1-bit offset
+//                          SAI_xFRCR_FSPOL;
+//    //SAI1_Block_B->FRCR &= ~SAI_xFRCR_FSOFF;                // turn off I2S 1-bit offset
+//
+//   // SAI1_Block_B->SLOTR = SAI1_Block_A->SLOTR;
+//    SAI1_Block_B->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
+//                          (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (n-1)
+//                          (0x3 << 16);                        // slots 0 and 1
     // 8. Clear flags
     SAI1_Block_A->CLRFR = 0xFFFFFFFF;
     SAI1_Block_B->CLRFR = 0xFFFFFFFF;
@@ -337,12 +363,13 @@ static void MX_DMA_Init(void) {
                           LL_DMA_MDATAALIGN_WORD | LL_DMA_PRIORITY_HIGH);
     LL_DMA_EnableFifoMode(DMA1, LL_DMA_STREAM_0);
     LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_0, LL_DMA_FIFOTHRESHOLD_1_2);
-
+    //disable fifo
+    DMA1_Stream0->FCR = 0x00;
     LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_0, LL_DMA_MDATAALIGN_WORD);
     LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_0, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for TX */
-    LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
-    LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
+    //LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
+    //LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
 
     /* SAI1_B DMA (RX) */
     LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
@@ -355,6 +382,8 @@ static void MX_DMA_Init(void) {
                           LL_DMA_MDATAALIGN_WORD | LL_DMA_PRIORITY_HIGH);
     LL_DMA_EnableFifoMode(DMA1, LL_DMA_STREAM_1);
     LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_1, LL_DMA_FIFOTHRESHOLD_1_2);
+    //disable fifo
+    //DMA1_Stream1->FCR = 0x00;
 
     LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_1, LL_DMA_MDATAALIGN_WORD);
     LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_1, LL_DMA_PDATAALIGN_WORD);
