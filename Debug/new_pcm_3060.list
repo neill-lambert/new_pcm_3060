@@ -3333,7 +3333,7 @@ static void MX_SAI1_Init(void)
                         (0x0 << SAI_xCR1_SYNCEN_Pos)  |  // Asynchronous
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
                         (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
-                        (3U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
+                        (4U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
                         SAI_xCR1_MCKEN;                   // MCLK out
     SAI1_Block_A->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
  8001680:	4b1c      	ldr	r3, [pc, #112]	@ (80016f4 <MX_SAI1_Init+0x124>)
@@ -3429,7 +3429,7 @@ static void MX_SAI1_Init(void)
  80016f0:	58024400 	.word	0x58024400
  80016f4:	40015804 	.word	0x40015804
  80016f8:	40015824 	.word	0x40015824
- 80016fc:	083000e0 	.word	0x083000e0
+ 80016fc:	084000e0 	.word	0x084000e0
  8001700:	00051f3f 	.word	0x00051f3f
  8001704:	00030180 	.word	0x00030180
  8001708:	00071f3f 	.word	0x00071f3f

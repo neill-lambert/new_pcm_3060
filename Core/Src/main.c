@@ -233,7 +233,7 @@ static void MX_SAI1_Init(void)
                         (0x0 << SAI_xCR1_SYNCEN_Pos)  |  // Asynchronous
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
                         (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
-                        (3U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
+                        (4U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
                         SAI_xCR1_MCKEN;                   // MCLK out
     SAI1_Block_A->CR1 |= SAI_xCR1_CKSTR;  // CKSTR=0 = sample on rising edge
 
