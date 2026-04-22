@@ -26,9 +26,9 @@
 
 
 /* Audio Buffers */
-#define AUDIO_BUFFER_SIZE 512
-__attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
-__attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
+	#define AUDIO_BUFFER_SIZE 512
+	__attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t tx_buffer[AUDIO_BUFFER_SIZE];
+	__attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
 extern volatile uint8_t audio_buffer_ready;
 //extern __IO uint32_t uwTick;  // add this temporarily to watch it
@@ -232,7 +232,7 @@ static void MX_SAI1_Init(void)
     SAI1_Block_A->CR1 = (0x0 << SAI_xCR1_MODE_Pos)   |  // Master TX
                         (0x0 << SAI_xCR1_SYNCEN_Pos)  |  // Asynchronous
                         (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
-                        (0x1 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
+                        (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
                         (4U << SAI_xCR1_MCKDIV_Pos)  |  // MCKDIV=2
 						SAI_xCR1_CKSTR				|  // CKSTR=0 = sample on rising edge
                         SAI_xCR1_MCKEN;                   // MCLK out
@@ -251,14 +251,14 @@ static void MX_SAI1_Init(void)
 
     SAI1_Block_A->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
                           (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (N-1)
-						  (0x8 << SAI_xSLOTR_FBOFF_Pos)		|	// fboff
+						  (0x0 << SAI_xSLOTR_FBOFF_Pos)		|	// fboff
                           (0x3 << 16);                        // enable slot 0 & 1
 
     // Block B - Slave RX (no MCKEN, no MCKDIV)
     SAI1_Block_B->CR1 =    (0x3 << SAI_xCR1_MODE_Pos)   |  // Slave RX
                            (0x1 << SAI_xCR1_SYNCEN_Pos)  |  // Sync with Block A
                            (0x7 << SAI_xCR1_DS_Pos)      |  // 32-bit
-						   (0x1 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
+						   (0x0 << SAI_xCR1_LSBFIRST_Pos)|  // MSB first
 						   SAI_xCR1_CKSTR;
     //SAI1_Block_B->CR1 &= ~SAI_xCR1_CKSTR;
 
@@ -275,7 +275,7 @@ static void MX_SAI1_Init(void)
 
     SAI1_Block_B->SLOTR = (0x2 << SAI_xSLOTR_SLOTSZ_Pos) |  // 32-bit slot
                           (0x1 << SAI_xSLOTR_NBSLOT_Pos)  |  // 2 slots (N-1)
-						  (0x8 << SAI_xSLOTR_FBOFF_Pos)		|	// fboff
+						  (0x0 << SAI_xSLOTR_FBOFF_Pos)		|	// fboff
                           (0x3 << 16);                        // enable slot 0 & 1
 
 
@@ -353,47 +353,51 @@ static void MX_DMA_Init(void) {
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);
 
     /* SAI1_A DMA (TX) */
-    LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+    //LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
     //LL_DMA_ConfigAddresses(DMA1, LL_DMA_STREAM_0, 0, 0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
-    LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
-    LL_DMA_SetPeriphRequest(DMA1, LL_DMA_STREAM_0, LL_DMAMUX1_REQ_SAI1_A);
+
     LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_0, LL_DMA_DIRECTION_MEMORY_TO_PERIPH |
                           LL_DMA_MODE_CIRCULAR | LL_DMA_PERIPH_NOINCREMENT |
                           LL_DMA_MEMORY_INCREMENT | LL_DMA_PDATAALIGN_WORD |
                           LL_DMA_MDATAALIGN_WORD | LL_DMA_PRIORITY_HIGH);
-    LL_DMA_EnableFifoMode(DMA1, LL_DMA_STREAM_0);
-    LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_0, LL_DMA_FIFOTHRESHOLD_1_2);
+    LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_0, AUDIO_BUFFER_SIZE);
+    LL_DMA_SetPeriphRequest(DMA1, LL_DMA_STREAM_0, LL_DMAMUX1_REQ_SAI1_A);
+
+    LL_DMA_DisableFifoMode(DMA1, LL_DMA_STREAM_0);
+    //LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_0, LL_DMA_FIFOTHRESHOLD_1_2);
     //disable fifo
-    DMA1_Stream0->FCR = 0x00;
-    LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_0, LL_DMA_MDATAALIGN_WORD);
-    LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_0, LL_DMA_PDATAALIGN_WORD);
+    //DMA1_Stream0->FCR = 0x00;
+    //LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_0, LL_DMA_MDATAALIGN_WORD);
+    //LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_0, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for TX */
     //LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_0);
     //LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_0);
 
     /* SAI1_B DMA (RX) */
-    LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+    //LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
     //LL_DMA_ConfigAddresses(DMA1, LL_DMA_STREAM_1, 0, 0, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
-    LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_1, AUDIO_BUFFER_SIZE);
-    LL_DMA_SetPeriphRequest(DMA1, LL_DMA_STREAM_1, LL_DMAMUX1_REQ_SAI1_B);
+
     LL_DMA_ConfigTransfer(DMA1, LL_DMA_STREAM_1, LL_DMA_DIRECTION_PERIPH_TO_MEMORY |
                           LL_DMA_MODE_CIRCULAR | LL_DMA_PERIPH_NOINCREMENT |
                           LL_DMA_MEMORY_INCREMENT | LL_DMA_PDATAALIGN_WORD |
                           LL_DMA_MDATAALIGN_WORD | LL_DMA_PRIORITY_HIGH);
-    LL_DMA_EnableFifoMode(DMA1, LL_DMA_STREAM_1);
-    LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_1, LL_DMA_FIFOTHRESHOLD_1_2);
+    LL_DMA_SetDataLength(DMA1, LL_DMA_STREAM_1, AUDIO_BUFFER_SIZE);
+    LL_DMA_SetPeriphRequest(DMA1, LL_DMA_STREAM_1, LL_DMAMUX1_REQ_SAI1_B);
+
+    LL_DMA_DisableFifoMode(DMA1, LL_DMA_STREAM_1);
+    //LL_DMA_SetFIFOThreshold(DMA1, LL_DMA_STREAM_1, LL_DMA_FIFOTHRESHOLD_1_2);
     //disable fifo
     //DMA1_Stream1->FCR = 0x00;
 
-    LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_1, LL_DMA_MDATAALIGN_WORD);
-    LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_1, LL_DMA_PDATAALIGN_WORD);
+    //LL_DMA_SetMemorySize(DMA1, LL_DMA_STREAM_1, LL_DMA_MDATAALIGN_WORD);
+    //LL_DMA_SetPeriphSize(DMA1, LL_DMA_STREAM_1, LL_DMA_PDATAALIGN_WORD);
     /* Enable interrupts for RX */
     LL_DMA_EnableIT_TC(DMA1, LL_DMA_STREAM_1);
     LL_DMA_EnableIT_HT(DMA1, LL_DMA_STREAM_1);
 
     /* NVIC configuration for DMA interrupts */
-    NVIC_SetPriority(DMA1_Stream0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 5, 0));
-    NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+//    NVIC_SetPriority(DMA1_Stream0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 5, 0));
+//    NVIC_EnableIRQ(DMA1_Stream0_IRQn);
     NVIC_SetPriority(DMA1_Stream1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 5, 0));
     NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 }

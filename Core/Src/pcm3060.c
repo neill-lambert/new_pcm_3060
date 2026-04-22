@@ -138,12 +138,12 @@ void PCM3060_Init(SPI_TypeDef *SPIx) {
     DWT_Delay_ms(5);  // wait for reset to complete
 
     // Configure ADC Control 2: attenuation l. 1101 0111b 215 = 0db.
-    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_L, 0xD7);
+    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_L, 0xC7);
     LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
     DWT_Delay_ms(5);  // wait for reset to complete
 
     // Configure ADC Control 2: attenuation r. 1101 0111b 215 = 0db.
-    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_R, 0xD7);
+    PCM3060_WriteReg(SPIx, PCM3060_REG_ADC_ATTEN_R, 0xC7);
     LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
     DWT_Delay_ms(5);  // wait for reset to complete
 

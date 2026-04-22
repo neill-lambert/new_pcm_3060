@@ -60,12 +60,9 @@
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_spi.h:2489:22:LL_SPI_TransmitData8	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:489:22:LL_DMA_EnableStream	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:574:22:LL_DMA_ConfigTransfer	1
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:804:22:LL_DMA_SetPeriphSize	1
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:855:22:LL_DMA_SetMemorySize	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1051:22:LL_DMA_SetDataLength	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1238:22:LL_DMA_SetPeriphRequest	3
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1690:22:LL_DMA_EnableFifoMode	1
-/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1717:22:LL_DMA_SetFIFOThreshold	1
+/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1668:22:LL_DMA_DisableFifoMode	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1840:22:LL_DMA_SetMemoryAddress	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:1865:22:LL_DMA_SetPeriphAddress	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_dma.h:2970:22:LL_DMA_EnableIT_HT	1
@@ -82,6 +79,6 @@
 ../Core/Src/main.c:207:13:MX_SAI1_Init	4
 ../Core/Src/main.c:311:13:MX_SPI4_Init	1
 ../Core/Src/main.c:352:13:MX_DMA_Init	1
-../Core/Src/main.c:401:13:MX_GPIO_Init	1
-../Core/Src/main.c:498:6:SystemClock_Config	12
-../Core/Src/main.c:724:6:Error_Handler	1
+../Core/Src/main.c:405:13:MX_GPIO_Init	1
+../Core/Src/main.c:502:6:SystemClock_Config	12
+../Core/Src/main.c:728:6:Error_Handler	1
