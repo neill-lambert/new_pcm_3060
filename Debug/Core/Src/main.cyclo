@@ -76,9 +76,9 @@
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_bus.h:2480:22:LL_APB2_GRP1_EnableClock	1
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h:35:13:DWT_Delay_ms	2
 ../Core/Src/main.c:45:5:main	17
-../Core/Src/main.c:207:13:MX_SAI1_Init	4
-../Core/Src/main.c:311:13:MX_SPI4_Init	1
-../Core/Src/main.c:352:13:MX_DMA_Init	1
-../Core/Src/main.c:405:13:MX_GPIO_Init	1
-../Core/Src/main.c:502:6:SystemClock_Config	12
-../Core/Src/main.c:728:6:Error_Handler	1
+../Core/Src/main.c:197:13:MX_SAI1_Init	4
+../Core/Src/main.c:282:13:MX_SPI4_Init	1
+../Core/Src/main.c:323:13:MX_DMA_Init	1
+../Core/Src/main.c:352:13:MX_GPIO_Init	1
+../Core/Src/main.c:435:6:SystemClock_Config	12
+../Core/Src/main.c:532:6:Error_Handler	1
