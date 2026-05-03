@@ -9,6 +9,6 @@
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_gpio.h:942:22:LL_GPIO_TogglePin	24	static
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h:35:13:DWT_Delay_ms	24	static
 ../Core/Src/pcm3060.c:27:6:PCM3060_WriteReg	16	static,ignoring_inline_asm
-../Core/Src/pcm3060.c:92:6:PCM3060_ClearBit	24	static
-../Core/Src/pcm3060.c:98:6:PCM3060_SetBit	24	static
-../Core/Src/pcm3060.c:104:6:PCM3060_Init	16	static
+../Core/Src/pcm3060.c:59:6:PCM3060_ClearBit	24	static
+../Core/Src/pcm3060.c:65:6:PCM3060_SetBit	24	static
+../Core/Src/pcm3060.c:71:6:PCM3060_Init	16	static

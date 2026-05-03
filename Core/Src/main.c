@@ -31,16 +31,13 @@ __attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_
 __attribute__((section(".RAM_D1"))) __attribute__((aligned(32))) volatile int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
 extern volatile uint8_t audio_buffer_ready;
-//extern __IO uint32_t uwTick;  // add this temporarily to watch it
+
 /* Private function prototypes */
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
-
-//void Disable_DCache_Safe(void);
-//void SAI_SafeStart(void);
 
 int main(void) {
 
@@ -61,8 +58,6 @@ int main(void) {
 
     // 2. Wait for the VOSRDY flag
 	while (LL_PWR_IsActiveFlag_VOS() == 0);
-
-	//RCC->APB4ENR |= RCC_APB4ENR_SYSCFGEN;
 
     // 3. Enable the VOS0 (Scale 0) for boosted performance
     LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE0);
@@ -86,7 +81,6 @@ int main(void) {
 
     SystemClock_Config();
 
-    //uint32_t sai_clk = LL_RCC_GetSAIClockFreq(LL_RCC_SAI1_CLKSOURCE);
     MX_GPIO_Init();
     DWT_Delay_ms(10);
     LL_GPIO_ResetOutputPin(PCM3060_RST_GPIO_Port, PCM3060_RST_Pin); // Active Low Reset
@@ -132,8 +126,7 @@ int main(void) {
     SAI1_Block_B->CR1 |= SAI_xCR1_DMAEN;
     SAI1_Block_A->CR1 |= SAI_xCR1_DMAEN;
 
-
-    // Crucial: Start the Slave block (B) before the Master block (A)
+    // Start the Slave block (B) before the Master block (A)
     // so the listener is ready before the talker starts the clock.
     SAI1_Block_B->CR1 |= SAI_xCR1_SAIEN;
     __DSB();
@@ -192,7 +185,7 @@ int main(void) {
 				//	tx_buffer[i+1] = 100000000;
 			}
     } //end while
-} //end main?
+} //end main
 
 static void MX_SAI1_Init(void)
 {
