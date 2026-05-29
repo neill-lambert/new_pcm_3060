@@ -17,13 +17,12 @@
  */
 
 #include <stdint.h>
-
 #include "main.h"
-
 #include <string.h>
-
 #include "pcm3060.h"
+#include "probe_processing.h"
 
+static ProbeContext *probe;
 
 /* Audio Buffers */
 #define AUDIO_BUFFER_SIZE 512
@@ -38,6 +37,10 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI4_Init(void);
 static void MX_SAI1_Init(void);
+
+//set flags before dma begins
+volatile uint8_t process_flag = 0;
+volatile uint8_t buffer_half = 0;
 
 int main(void) {
 
@@ -145,12 +148,14 @@ int main(void) {
         // Block B never locked - trap here
         while(1);
     }
+
     // 4. Enable the DMA Streams (The "Servant" is waiting)
     LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_0); // tx
     LL_DMA_EnableStream(DMA1, LL_DMA_STREAM_1); // rx
 
-
     LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_6);
+    // hardware init...
+    probe = probe_init();
 
 //    static int32_t sawtooth_accumulator = 0;
 //    const int32_t increment = 44739243/2; // 2^31 (Frequency)
@@ -170,20 +175,19 @@ int main(void) {
 
     while (1)
     {
+    	 if (process_flag)
+    	        {
+    	            process_flag = 0;
 
-    	while (audio_buffer_ready == 0){};
-		int offset = (audio_buffer_ready == 1) ? 0 : AUDIO_BUFFER_SIZE / 2;
-		audio_buffer_ready = 0;
-       	for (int i = offset; i < offset + AUDIO_BUFFER_SIZE / 2; i+=2)
-        	{
-			//	sawtooth_accumulator += increment;
-			//	tx_buffer[i+1]   = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
-	//			tx_buffer[i] = (uint32_t)sawtooth_accumulator & 0xFFFFFF00;
-     		//	tx_buffer[i] = rx_buffer[i+1] & 0xFFFFFF00;
-//        		tx_buffer[i+1] = rx_buffer[i+1];
-				// 	tx_buffer[i+1] = rx_buffer[i];// & 0xFFFFFF00;
-				//	tx_buffer[i+1] = 100000000;
-			}
+    	            uint32_t offset = buffer_half * AUDIO_BUFFER_SIZE/2;
+
+    	            probe_process(probe,
+    	                          (int32_t*)rx_buffer + offset,
+    	                          (int32_t*)tx_buffer + offset,
+    	                          AUDIO_BUFFER_SIZE/2);
+
+    	            SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[buffer_half * AUDIO_BUFFER_SIZE/2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    	        }
     } //end while
 } //end main
 

@@ -21,7 +21,8 @@ Core/Src/main.o: ../Core/Src/main.c \
  /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_system.h \
  /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/stm32h7xx_it.h \
  /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/pcm3060.h \
- /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h
+ /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h \
+ /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/probe_processing.h
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h7xx.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h:
@@ -45,3 +46,4 @@ Core/Src/main.o: ../Core/Src/main.c \
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/stm32h7xx_it.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/pcm3060.h:
 /home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/main.h:
+/home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc/probe_processing.h:
