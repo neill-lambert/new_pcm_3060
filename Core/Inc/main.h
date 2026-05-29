@@ -24,6 +24,9 @@ typedef enum {
 }alignment;
 
 volatile extern alignment myAlign;
+extern volatile uint8_t process_flag;
+extern volatile uint8_t buffer_half;
+
 
 void Error_Handler(void);
 

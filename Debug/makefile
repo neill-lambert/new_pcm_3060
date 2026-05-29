@@ -12,6 +12,21 @@ RM := rm -rf
 -include Startup/subdir.mk
 -include Drivers/STM32H7xx_HAL_Driver/Src/Legacy/subdir.mk
 -include Drivers/STM32H7xx_HAL_Driver/Src/subdir.mk
+-include Drivers/CMSIS/DSP/Source/TransformFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/SupportFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/StatisticsFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/SVMFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/QuaternionMathFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/MatrixFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/InterpolationFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/FilteringFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/FastMathFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/DistanceFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/ControllerFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/ComplexMathFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/CommonTables/subdir.mk
+-include Drivers/CMSIS/DSP/Source/BayesFunctions/subdir.mk
+-include Drivers/CMSIS/DSP/Source/BasicMathFunctions/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
 
@@ -62,7 +77,7 @@ main-build: new_pcm_3060.elf secondary-outputs
 
 # Tool invocations
 new_pcm_3060.elf new_pcm_3060.map: $(OBJS) $(USER_OBJS) /home/neill-lambert/Documents/github/new_pcm_3060/STM32H723ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "new_pcm_3060.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/home/neill-lambert/Documents/github/new_pcm_3060/STM32H723ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="new_pcm_3060.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "new_pcm_3060.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"/home/neill-lambert/Documents/github/new_pcm_3060/STM32H723ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="new_pcm_3060.map" -Wl,--gc-sections -static -Wl,--allow-multiple-definition --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

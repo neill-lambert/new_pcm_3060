@@ -38,6 +38,7 @@
 extern int32_t tx_buffer[AUDIO_BUFFER_SIZE];
 extern int32_t rx_buffer[AUDIO_BUFFER_SIZE];
 
+//    // Copy First Hal
 volatile uint8_t audio_buffer_ready = 0;
 volatile uint32_t tx_irq_count = 0;
 volatile uint32_t rx_irq_count = 0;
@@ -207,13 +208,14 @@ void DMA_STR1_IRQHandler(void)
     LL_DMA_ClearFlag_HT1(DMA1);
     /* Invalidate the first half of the RX buffer to ensure CPU sees DMA updates */
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
-
-    // Copy First Half
-      for(int i = 0; i < 256; i++)
-  	   {
-  		   tx_buffer[i] = rx_buffer[i];
-  	   }
-    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    buffer_half  = 0;
+    process_flag = 1;
+//    // Copy First Half
+//      for(int i = 0; i < 256; i++)
+//  	   {
+//  		   tx_buffer[i] = rx_buffer[i];
+//  	   }
+//    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[0], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
 
   }
   if (LL_DMA_IsActiveFlag_TC1(DMA1))
@@ -223,12 +225,14 @@ void DMA_STR1_IRQHandler(void)
 
     SCB_InvalidateDCache_by_Addr((uint32_t *)&rx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
     rx_irq_count++;
-    // Copy Second Half
-   for(int i = 256; i < 512; i++)
-	   {
-		   tx_buffer[i] = rx_buffer[i];
-	   }
-    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
+    buffer_half  = 1;
+    process_flag = 1;
+//    // Copy Second Half
+//   for(int i = 256; i < 512; i++)
+//	   {
+//		   tx_buffer[i] = rx_buffer[i];
+//	   }
+//    SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[AUDIO_BUFFER_SIZE / 2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
   }
 }
 

@@ -7,6 +7,7 @@
 C_SRCS += \
 ../Core/Src/main.c \
 ../Core/Src/pcm3060.c \
+../Core/Src/probe_processing.c \
 ../Core/Src/stm32h7xx_it.c \
 ../Core/Src/syscalls.c \
 ../Core/Src/sysmem.c \
@@ -15,6 +16,7 @@ C_SRCS += \
 OBJS += \
 ./Core/Src/main.o \
 ./Core/Src/pcm3060.o \
+./Core/Src/probe_processing.o \
 ./Core/Src/stm32h7xx_it.o \
 ./Core/Src/syscalls.o \
 ./Core/Src/sysmem.o \
@@ -23,6 +25,7 @@ OBJS += \
 C_DEPS += \
 ./Core/Src/main.d \
 ./Core/Src/pcm3060.d \
+./Core/Src/probe_processing.d \
 ./Core/Src/stm32h7xx_it.d \
 ./Core/Src/syscalls.d \
 ./Core/Src/sysmem.d \
@@ -31,12 +34,12 @@ C_DEPS += \
 
 # Each subdirectory must supply rules for building sources it contributes
 Core/Src/%.o Core/Src/%.su Core/Src/%.cyclo: ../Core/Src/%.c Core/Src/subdir.mk
-	arm-none-eabi-gcc "$<" -mcpu=cortex-m7 -std=gnu11 -g3 -DDEBUG -DUSE_FULL_LL_DRIVER -DCORE_CM7 -DSTM32H723xx -c -I"/home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Include" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Device/ST/STM32H7xx/Include" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -o "$@"
+	arm-none-eabi-gcc "$<" -mcpu=cortex-m7 -std=gnu11 -g3 -DDEBUG -DARM_MATH_CM7 -DUSE_FULL_LL_DRIVER -DCORE_CM7 -DSTM32H723xx -c -I"/home/neill-lambert/Documents/github/new_pcm_3060/Core/Inc" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/DSP/Include" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/DSP/PrivateInclude" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Include" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/CMSIS/Device/ST/STM32H7xx/Include" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc" -I"/home/neill-lambert/Documents/github/new_pcm_3060/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -o "$@"
 
 clean: clean-Core-2f-Src
 
 clean-Core-2f-Src:
-	-$(RM) ./Core/Src/main.cyclo ./Core/Src/main.d ./Core/Src/main.o ./Core/Src/main.su ./Core/Src/pcm3060.cyclo ./Core/Src/pcm3060.d ./Core/Src/pcm3060.o ./Core/Src/pcm3060.su ./Core/Src/stm32h7xx_it.cyclo ./Core/Src/stm32h7xx_it.d ./Core/Src/stm32h7xx_it.o ./Core/Src/stm32h7xx_it.su ./Core/Src/syscalls.cyclo ./Core/Src/syscalls.d ./Core/Src/syscalls.o ./Core/Src/syscalls.su ./Core/Src/sysmem.cyclo ./Core/Src/sysmem.d ./Core/Src/sysmem.o ./Core/Src/sysmem.su ./Core/Src/system_stm32h7xx.cyclo ./Core/Src/system_stm32h7xx.d ./Core/Src/system_stm32h7xx.o ./Core/Src/system_stm32h7xx.su
+	-$(RM) ./Core/Src/main.cyclo ./Core/Src/main.d ./Core/Src/main.o ./Core/Src/main.su ./Core/Src/pcm3060.cyclo ./Core/Src/pcm3060.d ./Core/Src/pcm3060.o ./Core/Src/pcm3060.su ./Core/Src/probe_processing.cyclo ./Core/Src/probe_processing.d ./Core/Src/probe_processing.o ./Core/Src/probe_processing.su ./Core/Src/stm32h7xx_it.cyclo ./Core/Src/stm32h7xx_it.d ./Core/Src/stm32h7xx_it.o ./Core/Src/stm32h7xx_it.su ./Core/Src/syscalls.cyclo ./Core/Src/syscalls.d ./Core/Src/syscalls.o ./Core/Src/syscalls.su ./Core/Src/sysmem.cyclo ./Core/Src/sysmem.d ./Core/Src/sysmem.o ./Core/Src/sysmem.su ./Core/Src/system_stm32h7xx.cyclo ./Core/Src/system_stm32h7xx.d ./Core/Src/system_stm32h7xx.o ./Core/Src/system_stm32h7xx.su
 
 .PHONY: clean-Core-2f-Src
 
