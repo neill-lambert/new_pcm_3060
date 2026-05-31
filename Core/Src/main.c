@@ -185,7 +185,7 @@ int main(void) {
     	                          (int32_t*)rx_buffer + offset,
     	                          (int32_t*)tx_buffer + offset,
     	                          AUDIO_BUFFER_SIZE/2);
-
+    	            //maybe this should happn evry buffer not evry half buffer??
     	            SCB_CleanDCache_by_Addr((uint32_t *)&tx_buffer[buffer_half * AUDIO_BUFFER_SIZE/2], (AUDIO_BUFFER_SIZE / 2) * sizeof(int32_t));
     	        }
     } //end while
